@@ -1,0 +1,17 @@
+# Carpetas de construcción de ROS 2 (NUNCA SUBIR ESTO)
+build/
+install/
+log/
+
+# Archivos temporales de Python y C++
+__pycache__/
+*.pyc
+*.o
+*.so
+
+# Carpetas de IDEs (configuraciones personales)
+.vscode/
+.idea/
+
+# Archivos de sistema
+.DS_Store
