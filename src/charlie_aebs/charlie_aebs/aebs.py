@@ -1,151 +1,114 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import TwistStamped 
-from rclpy.qos import qos_profile_sensor_data
-import math
+from geometry_msgs.msg import TwistStamped # <--- CAMBIO 1: Importar TwistStamped
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+import numpy as np
 
-class AEBSOverrideNode(Node):
+class AEBSNode(Node):
     def __init__(self):
-        super().__init__('aebs_override_node')
+        super().__init__('aebs_node')
 
-        # --- CONFIGURACIÓN DE GEOMETRÍA (Basado en tus Xacros) ---
+        # Parámetros
         self.declare_parameter('robot_width', 0.44)
-        self.robot_width = self.get_parameter('robot_width').get_parameter_value().double_value
-
-        self.declare_parameter('safety_margin', 0.18)
-        self.safety_margin = self.get_parameter('safety_margin').get_parameter_value().double_value
-
-        self.declare_parameter('ttc_threshold', 0.5)
-        self.ttc_threshold = self.get_parameter('ttc_threshold').get_parameter_value().double_value
-            
-        # Calculamos el medio ancho del "Túnel de Seguridad"
-        # Si un obstáculo está dentro de este ancho Y, es peligroso. Si está fuera, lo ignoramos.
-        self.safe_half_width = (self.robot_width / 2.0) + self.safety_margin
+        self.declare_parameter('ttc_threshold', 0.7)
         
-        self.latest_scan = None
+        self.width = self.get_parameter('robot_width').value
+        self.ttc_min = self.get_parameter('ttc_threshold').value
+        self.half_width = (self.width / 2.0) + 0.1 # +10cm margen
 
-        # Suscripciones y Publicadores
-        self.scan_sub = self.create_subscription(
-            LaserScan,
-            '/scan',
-            self.scan_callback,
-            qos_profile_sensor_data)
+        # Variables para Numpy
+        self.ranges = None
+        self.angles = None
 
-        self.joy_sub = self.create_subscription(
-            TwistStamped,
-            '/cmd_vel_joy', 
-            self.monitor_callback,
-            10)
+        # QoS para Lidar
+        qos_sensor = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1
+        )
 
-        self.override_pub = self.create_publisher(
-            TwistStamped,
-            '/cmd_vel_aebs', 
-            10)
-        
-      
-        self.ctrl_sub = self.create_subscription(
-            TwistStamped,
-            '/cmd_vel_ctrl', 
-            self.monitor_callback,
-            10)
+        # 1. SUSCRIPCIÓN (Input) - TwistStamped
+        # Escuchamos al topic _raw que sale de tu TwistMux
+        self.cmd_sub = self.create_subscription(TwistStamped, '/cmd_vel_raw', self.cmd_callback, 10)
+        self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_sensor)
 
+        # 2. PUBLICACIÓN (Output) - TwistStamped
+        # Publicamos al topic final que escucha tu controlador
+        self.cmd_pub = self.create_publisher(TwistStamped, '/diffdrive_controller/cmd_vel', 10)
 
-        self.get_logger().info(f'AEBS Geométrico Iniciado.')
-        self.get_logger().info(f'Ancho Robot: {self.robot_width}m | Margen: {self.safety_margin}m')
-        self.get_logger().info(f'Túnel de detección: +/- {self.safe_half_width:.3f}m del centro.')
-        self.get_logger().info(f'Umbral de TTC: {self.ttc_threshold:.2f}s')
+        self.get_logger().info("AEBS System Active (TwistStamped Mode)")
 
     def scan_callback(self, msg):
-        self.latest_scan = msg
-
-    def calculate_ttc(self, intended_speed):
-        """
-        Calcula TTC usando filtrado cartesiano (Túnel de Seguridad).
-        """
-        if self.latest_scan is None:
-            return float('inf')
-
-        min_ttc = float('inf')
+        # Conversión a Numpy (Igual que antes)
+        self.ranges = np.array(msg.ranges)
         
-        # Pre-cálculos para eficiencia
-        angle_min = self.latest_scan.angle_min
-        angle_inc = self.latest_scan.angle_increment
-        ranges = self.latest_scan.ranges
-
-        for i, r in enumerate(ranges):
-            # 1. Filtro de rango válido
-            if not (self.latest_scan.range_min < r < self.latest_scan.range_max):
-                continue
-
-            # 2. Calcular ángulo
-            theta = angle_min + (i * angle_inc)
+        if self.angles is None or len(self.angles) != len(msg.ranges):
+            self.angles = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
             
-            # 3. CONVERSIÓN A CARTESIANAS (La clave de la geometría)
-            # Y = Distancia lateral respecto al centro del robot
-            # X = Distancia frontal
-            y_obstacle = r * math.sin(theta)
-            x_obstacle = r * math.cos(theta)
+        valid = np.isfinite(self.ranges) & (self.ranges > msg.range_min) & (self.ranges < msg.range_max)
+        self.ranges = self.ranges[valid]
+        self.angles = self.angles[valid]
 
-            # 4. FILTRO GEOMÉTRICO (El "Túnel")
-            # Si el obstáculo está más afuera que nuestro ancho seguro, lo ignoramos.
-            # Esto permite pasar por pasillos donde las paredes están cerca pero no tocan.
-            if abs(y_obstacle) > self.safe_half_width:
-                continue
+    def cmd_callback(self, msg):
+        if self.ranges is None: 
+            return 
 
-            # 5. FILTRO DE DIRECCIÓN
-            # Si vamos adelante (speed > 0), solo nos importan obstáculos con X > 0 (adelante)
-            # Si vamos atrás (speed < 0), solo nos importan obstáculos con X < 0 (atrás)
-            # Nota: Usamos una pequeña zona muerta (0.05) para no detectar el propio chasis si el lidar está mal puesto
-            if intended_speed > 0 and x_obstacle < 0.05:
-                continue
-            if intended_speed < 0 and x_obstacle > -0.05:
-                continue
-
-            # 6. CÁLCULO TTC (Proyección de velocidad)
-            # closing_speed = Speed_X_component
-            # Como ya filtramos por geometría, proyectamos la velocidad sobre el rayo
-            closing_speed = intended_speed * math.cos(theta)
-
-            if closing_speed > 0:
-                ttc = r / closing_speed
-                if ttc < min_ttc:
-                    min_ttc = ttc
+        vx = msg.twist.linear.x
         
-        return min_ttc
-
-    def monitor_callback(self, msg):
-        current_vx = msg.twist.linear.x
-        
-        # Calculamos riesgo si hay movimiento
-        if abs(current_vx) > 0.01:
+        # 1. Chequeamos si hay movimiento significativo (Adelante O Atrás)
+        if abs(vx) > 0.05:
             
-            ttc = self.calculate_ttc(current_vx)
+            # --- CÁLCULO VECTORIAL ---
+            x_points = self.ranges * np.cos(self.angles)
+            y_points = self.ranges * np.sin(self.angles)
 
-            if ttc < self.ttc_threshold:
-                # Logueamos solo cada 1 seg para no saturar
-                self.get_logger().warning(f'¡COLISIÓN EN TRAYECTORIA! TTC: {ttc:.2f}s', throttle_duration_sec=1.0)
+            # 2. DEFINIR LA MÁSCARA DE DIRECCIÓN (La clave del cambio)
+            if vx > 0:
+                # Si voy adelante -> Busco obstáculos con X positiva
+                direction_mask = x_points > 0
+            else:
+                # Si voy atrás -> Busco obstáculos con X negativa
+                direction_mask = x_points < 0
+
+            # 3. Filtro de Túnel (Funciona igual para ambos lados)
+            # Queremos puntos en la dirección del movimiento Y dentro del ancho
+            tunnel_mask = direction_mask & (np.abs(y_points) < self.half_width)
+            
+            # Obtenemos las coordenadas X de los obstáculos peligrosos
+            dangers_x = x_points[tunnel_mask]
+            
+            if len(dangers_x) > 0:
+                # 4. Cálculo de TTC
+                # Matemáticamente funciona perfecto para reversa:
+                # Distancia (-2m) / Velocidad (-1m/s) = TTC Positivo (2s)
+                ttc_values = dangers_x / vx 
                 
-                override_msg = TwistStamped()
-                override_msg.header.stamp = self.get_clock().now().to_msg()
-                override_msg.header.frame_id = msg.header.frame_id
-                
-                override_msg.twist.linear.x = 0.0      # FRENAR
-                override_msg.twist.angular.z = msg.twist.angular.z # Permitir esquivar
-                
-                self.override_pub.publish(override_msg)
-                return
+                # OJO: A veces por ruido numérico puede salir un TTC negativo pequeño, 
+                # filtramos para quedarnos solo con los positivos reales.
+                ttc_values = ttc_values[ttc_values > 0]
+
+                if len(ttc_values) > 0:
+                    min_ttc = np.min(ttc_values)
+
+                    if min_ttc < self.ttc_min:
+                        direction_str = "ADELANTE" if vx > 0 else "ATRÁS"
+                        self.get_logger().warn(f"FRENO {direction_str}! TTC: {min_ttc:.2f}s", throttle_duration_sec=0.5)
+                        
+                        safe_msg = TwistStamped()
+                        safe_msg.header = msg.header 
+                        safe_msg.twist.linear.x = 0.0
+                        safe_msg.twist.angular.z = msg.twist.angular.z
+                        
+                        self.cmd_pub.publish(safe_msg)
+                        return
+
+        # Si no hay peligro o estamos quietos, republicamos
+        self.cmd_pub.publish(msg)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = AEBSOverrideNode()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
+    node = AEBSNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
