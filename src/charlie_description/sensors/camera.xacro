@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+
+
+    <!-- camera_base link -->
+
+    <link name="camera_base_link">
+         <visual>
+            <geometry>
+                <box size="${cam_base_x} ${cam_base_y} ${cam_base_z}"/>
+            </geometry>
+            <material name="purple"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${cam_base_x} ${cam_base_y} ${cam_base_z}"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_box mass="0.1" x="${cam_base_x}" y="${cam_base_y}" z="${cam_base_z}">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
+    </link>
+
+   <!-- camera link -->
+    <link name="camera_link">
+         <visual>
+            <geometry>
+                <box size="${cam_x} ${cam_y} ${cam_z}"/>
+            </geometry>
+            <material name="purple"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${cam_x} ${cam_y} ${cam_z}"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_box mass="0.1" x="${cam_x}" y="${cam_y}" z="${cam_z}">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
+    </link>
+
+    <joint name="camera_camera_base_joint" type="fixed">
+        <parent link="camera_base_link"/>
+        <child link="camera_link"/>
+        <origin xyz="0 0 ${cam_base_z/2+cam_z/2}" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="camera_base_chassis_joint" type="fixed">
+        <parent link="chassis"/>
+        <child link="camera_base_link"/>
+        <origin xyz="${lx/2-cam_base_x/2} 0 ${lz/2+cam_base_z/2}" rpy="0 0 0"/>
+    </joint>
+
+
+
+    <link name="camera_optical_link"/>
+
+    <joint name="camera_camera_link_joint" type="fixed">
+        <parent link="camera_link"/>
+        <child link="camera_optical_link"/>
+        <origin xyz="0 0 0" rpy="-${pi/2} 0 -${pi/2}"/>
+    </joint>
+   
+    <!-- Gazebo Camera Sensor -->
+    <gazebo reference="camera_link">
+        <sensor name="camera" type="camera">
+            <always_on>true</always_on>
+            <update_rate>30.0</update_rate> <visualize>true</visualize>     <topic>camera/image_raw</topic> <gz_frame_id>camera_optical_link</gz_frame_id>
+
+            <camera>
+                <horizontal_fov>1.089</horizontal_fov> <image>
+                    <width>640</width>
+                    <height>480</height>
+                    <format>R8G8B8</format>
+                </image>
+                <clip>
+                    <near>0.05</near>
+                    <far>8.0</far>
+                </clip>
+            </camera>
+        </sensor>
+    </gazebo>
+
+</robot>

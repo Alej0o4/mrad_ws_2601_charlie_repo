@@ -18,8 +18,8 @@ def generate_launch_description():
     world = LaunchConfiguration("world")
 
     # --- Robot description (xacro -> URDF XML string) ---
-    # xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "diffdrive_urdf", "robot.urdf.xacro")
-    xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "ackerman_2x4_urdf", "robot.urdf.xacro")
+    xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "diffdrive_urdf", "robot.urdf.xacro")
+    # xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "ackerman_2x4_urdf", "robot.urdf.xacro")
     robot_description = xacro.process_file(xacro_file).toxml()
 
     rsp = Node(
@@ -50,7 +50,7 @@ def generate_launch_description():
         arguments=[
             "-name", "diffbot",
             "-topic", "robot_description",
-            "-x", "0.0", "-y", "0.0", "-z", "0.5",
+            "-x", "-7.0", "-y", "-3.0", "-z", "0.5", "-Y", "-1.5708"
         ],
     )
 
@@ -113,7 +113,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "world",
             # default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "empty_world.sdf"),
-            default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "walls_practice.sdf"),
+            default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "demo_race_track.sdf"),
             description="Full path to world SDF file",
         ),
         gz_launch,

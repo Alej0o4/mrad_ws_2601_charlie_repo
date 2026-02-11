@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+
+
+    <!-- depth_camera_base link -->
+    <xacro:property name="camera_name" value="depth_camera_1"/>
+    <xacro:property name="frame_name" value="depth_camera_optical_link"/>
+
+
+    <link name="depth_camera_base_link">
+         <visual>
+            <geometry>
+                <box size="${cam_base_x} ${cam_base_y} ${cam_base_z}"/>
+            </geometry>
+            <material name="purple"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${cam_base_x} ${cam_base_y} ${cam_base_z}"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_box mass="0.1" x="${cam_base_x}" y="${cam_base_y}" z="${cam_base_z}">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
+    </link>
+
+   <!-- depth_camera link -->
+    <link name="depth_camera_link">
+         <visual>
+            <geometry>
+                <box size="${cam_x} ${cam_y} ${cam_z}"/>
+            </geometry>
+            <material name="purple"/>
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${cam_x} ${cam_y} ${cam_z}"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_box mass="0.1" x="${cam_x}" y="${cam_y}" z="${cam_z}">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
+    </link>
+
+    <joint name="depth_camera_depth_camera_base_joint" type="fixed">
+        <parent link="depth_camera_base_link"/>
+        <child link="depth_camera_link"/>
+        <origin xyz="0 0 ${cam_base_z/2+cam_z/2}" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="depth_camera_base_chassis_joint" type="fixed">
+        <parent link="chassis"/>
+        <child link="depth_camera_base_link"/>
+        <origin xyz="${lx/2-cam_base_x/2} 0 ${lz/2+cam_base_z/2}" rpy="0 0 0"/>
+    </joint>
+
+
+
+    <link name="depth_camera_optical_link"/>
+
+    <joint name="depth_camera_depth_camera_link_joint" type="fixed">
+        <parent link="depth_camera_link"/>
+        <child link="depth_camera_optical_link"/>
+        <origin xyz="0 0 0" rpy="-${pi/2} 0 -${pi/2}"/>
+    </joint>
+
+    <!-- Gazebo Depth depth_camera Sensor -->
+    <gazebo reference="depth_camera_link">
+        <sensor name="depth_camera_1" type="rgbd_camera">
+            <update_rate>20</update_rate>
+            <topic>depth_camera_1</topic> <always_on>true</always_on>
+            <visualize>true</visualize>
+            
+            <gz_frame_id>depth_camera_link</gz_frame_id>
+
+            <camera>
+                <horizontal_fov>1.047198</horizontal_fov>
+                <image>
+                    <width>640</width>
+                    <height>480</height>
+                    <format>R8G8B8</format>
+                </image>
+                <clip>
+                    <near>0.05</near>
+                    <far>8.0</far> </clip>
+                <depth_camera>
+                  <output>points</output> <clip>
+                    <near>0.05</near>
+                    <far>8.0</far>
+                  </clip>
+                </depth_camera>
+            </camera>
+        </sensor>
+    </gazebo>
+    
+
+</robot>

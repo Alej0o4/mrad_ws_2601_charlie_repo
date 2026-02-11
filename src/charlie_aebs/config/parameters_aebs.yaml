@@ -1,0 +1,5 @@
+aebs:
+  ros__parameters:
+    robot_width: 0.44
+    safety_margin: 0.18
+    ttc_threshold: 1.1

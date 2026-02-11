@@ -1,0 +1,17 @@
+# Parámetros para el Nodo que calcula el Error
+dist_finder:
+  ros__parameters:
+    desired_distance: 1.5       # Metros a la pared
+    desired_wall_side: -1        # 1: Izquierda, -1: Derecha
+    lookahead_dist: 0.5         # Metros a proyectar a futuro (Juega con esto!)
+    theta: 1.0472               # Ángulo de apertura (60 grados en radianes)
+    # Nota: ray_b_angle se calcula en el nodo basado en el lado, 
+    # pero si quisieras forzarlo, podrías agregarlo aquí.
+
+# Parámetros para el Nodo de Control (PID)
+control:
+  ros__parameters:
+    kp: 1.2                     # Ganancia Proporcional (Fuerza de giro)
+    kd: 0.4                     # Ganancia Derivativa (Amortiguación)
+    max_speed: 0.8              # Velocidad máxima en rectas (m/s)
+    max_steering: 0.8           # Límite físico de las llantas (rad)
