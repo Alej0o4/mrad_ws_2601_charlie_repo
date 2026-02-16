@@ -13,5 +13,5 @@ control:
   ros__parameters:
     kp: 1.2                     # Ganancia Proporcional (Fuerza de giro)
     kd: 0.4                     # Ganancia Derivativa (Amortiguación)
-    max_speed: 1.5              # Velocidad máxima en rectas (m/s)
-    max_steering: 1.0           # Límite físico de las llantas (rad)
+    max_speed: 3.0              # Velocidad máxima en rectas (m/s)
+    max_steering: 3.0           # Límite físico de las llantas (rad)
