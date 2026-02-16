@@ -29,6 +29,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'ttc_control = charlie_ttc_follow_the_gap.ttc_control:main',
+            'ttc_gap_finder = charlie_ttc_follow_the_gap.ttc_gap_finder:main'
         ],
     },
 )
