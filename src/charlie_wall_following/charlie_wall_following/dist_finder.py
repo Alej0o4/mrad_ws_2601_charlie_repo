@@ -19,7 +19,7 @@ class DistFinder(Node):
         self.desired_distance = self.get_parameter('desired_distance').get_parameter_value().double_value
 
         # Lado de la pared: Left (1) or Right (-1)
-        self.declare_parameter('desired_wall_side', -1) 
+        self.declare_parameter('desired_wall_side', 1) 
         self.desired_wall_side = self.get_parameter('desired_wall_side').get_parameter_value().integer_value
 
         # Lookahead Distance (L): Qué tan adelante proyectamos el error
@@ -31,7 +31,7 @@ class DistFinder(Node):
         self.declare_parameter('ray_b_angle', self.desired_wall_side * np.pi/2) 
         self.ray_b_angle = self.get_parameter('ray_b_angle').get_parameter_value().double_value
 
-        # Theta: Separación entre rayos (45 grados)
+        # Theta: Separación entre rayos (60 grados)
         self.declare_parameter('theta', np.radians(60)) 
         self.theta = self.get_parameter('theta').get_parameter_value().double_value
 
@@ -47,47 +47,66 @@ class DistFinder(Node):
         self.get_logger().info(f"Desired Distance: {self.desired_distance} | Wall Side: {'Left' if self.desired_wall_side == 1 else 'Right'} | Lookahead: {self.lookahead_dist}")
 
     def callback(self, msg):
-        # 1. Obtener distancias a y b
+        # 1. Perception: Check surroundings
+        total = len(msg.ranges)
+        left_sector = np.array(msg.ranges[int(total*0.7):int(total*0.9)]) # Adjusted indices
+        right_sector = np.array(msg.ranges[int(total*0.1):int(total*0.3)])
+        
+        # Filter valid points
+        left_valid = left_sector[np.isfinite(left_sector)]
+        right_valid = right_sector[np.isfinite(right_sector)]
+        
+        # 2. Logic: Choose wall (with a bit of stickiness/hysteresis)
+        # Only change side if the current side is totally lost or front is blocked
+        l_dist = np.mean(left_valid) if len(left_valid) > 0 else 5.0
+        r_dist = np.mean(right_valid) if len(right_valid) > 0 else 5.0
+
+        # Example: Simple logic to favor the closer wall
+        side_threshold = 0.2
+
+        if abs(l_dist - r_dist) > side_threshold:
+            if l_dist < r_dist:
+                self.desired_wall_side = 1
+            else:
+                self.desired_wall_side = -1
+        # si no supera el umbral → mantener lado actual
+
+
+        self.ray_b_angle = self.desired_wall_side * np.pi/2
+
+        front_sector = np.array(msg.ranges[int(total*0.45):int(total*0.55)])
+        front_valid = front_sector[np.isfinite(front_sector)]
+        front_min = np.min(front_valid) if len(front_valid) > 0 else 5.0
+
+        if front_min < 1.0:
+            self.desired_wall_side = 1 if l_dist > r_dist else -1
+
+
+
+        # 3. Calculation
         b, a = self.getRange(msg)
-
-        # Si el lidar da infinito o error, salimos para no dividir por cero
-        if np.isinf(b) or np.isinf(a) or np.isnan(b) or np.isnan(a):
-            return
-
-        # 2. Calcular Alpha (Ángulo del robot respecto a la pared)
-        # Fórmula: arctan( (a*cos(th) - b) / (a*sin(th)) )
-        numerator = (a * np.cos(self.theta)) - b
-        denominator = a * np.sin(self.theta)
         
-        # Evitar división por cero
-        if denominator == 0:
-            return
+        # Fallback for missing data
+        if not np.isfinite(a) or not np.isfinite(b):
+            # Publish a 'safe' error to keep turning away from wall
+            error = 0.5 * self.desired_wall_side
+        else:
+            # Standard Alpha/Dist calculation (Your existing math)
+            num = (a * np.cos(self.theta)) - b
+            den = a * np.sin(self.theta)
+            alpha = np.arctan2(num, den) # Using arctan2 is safer
             
-        alpha = np.arctan(numerator / denominator)
+            dist_t = b * np.cos(alpha)
+            dist_t_1 = dist_t + self.lookahead_dist * np.sin(alpha)
+            
+            # Calculate Error
+            error = (dist_t_1 - self.desired_distance) * self.desired_wall_side
 
-        # 3. Calcular Distancia Actual (Dt) (AB en las diapositivas)
-        dist_t = b * np.cos(alpha)
-
-        # 4. Calcular Distancia Futura (Dt+1) (CD en las diapositivas)
-        # Aquí usamos una distancia definida o también se puede hacer proporcional a la velocidad pero en este caso se dejó un valor constante (AC)
-        # Dt+1 = Dt + AC * sin(alpha)
-        dist_t_1 = dist_t + self.lookahead_dist * np.sin(alpha)
-
-        # 5. Calcular Error (CORREGIDO PARA ROS)
-        # Lógica:
-        # - Pared Izq (1):  Queremos (Actual - Deseada)  -> Si Actual < Deseada => Negativo => Gira Derecha
-        # - Pared Der (-1): Queremos (Deseada - Actual)  -> Si Actual < Deseada => Positivo => Gira Izquierda
-        
-        error = (dist_t_1 - self.desired_distance) * self.desired_wall_side
-
-        # Publicar
-        msg_error = Float32()
-        msg_error.data = float(error) # Asegurar que es float de python
-        self.error_publisher.publish(msg_error)
+        # 4. Publish
+        error_msg = Float32()
+        error_msg.data = float(error)
+        self.error_publisher.publish(error_msg)
         self.publish_debug_rays(b, a, msg.header)
-        
-        # Debug (Opcional)
-        # self.get_logger().info(f"Dt: {dist_t:.2f} | Futura: {dist_t_1:.2f} | Error: {error:.2f}")
 
     def getRange(self, msg):
         # Rayo B: A 90 grados

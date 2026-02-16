@@ -22,7 +22,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             config_file_path,
-            {'use_sim_time': True}  # <--- AGREGA ESTO
+            {'use_sim_time': True}  
         ]
     )
 
@@ -34,7 +34,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             config_file_path,
-            {'use_sim_time': True}  # <--- AGREGA ESTO
+            {'use_sim_time': True}  
         ]
     )
 

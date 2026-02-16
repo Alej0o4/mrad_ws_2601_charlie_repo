@@ -12,7 +12,7 @@ teleop_node:
       x: 1.5
 
     axis_angular:
-      yaw: 2 # forward right # 2 on logitech and 3 on sony controller
+      yaw: 3 # forward right # 2 on logitech and 3 on sony controller
     scale_angular:
       yaw: 3.0
 
