@@ -2,6 +2,6 @@ aebs:
   ros__parameters:
     robot_width: 0.44
     safety_margin: 0.18
-    ttc_threshold: 1.2
+    ttc_threshold: 0.8
     aebs_mode: "tunnel"  
     safety_factor: 2.0

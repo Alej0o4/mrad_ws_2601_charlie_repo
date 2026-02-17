@@ -16,6 +16,8 @@ class TtcControl(Node):
         # Límite físico de giro del robot (rad/s)
         self.declare_parameter('max_steering', 1.0)
 
+        self.last_target_angle = 0.0
+
         # Leer parámetros
         self.kp = self.get_parameter('kp').value
         self.max_speed = self.get_parameter('max_speed').value
@@ -43,7 +45,18 @@ class TtcControl(Node):
         # msg viene del gap_finder. 
         # msg.twist.angular.z contiene el ángulo hacia el centro del hueco (gap).
         
-        target_angle = msg.twist.angular.z
+        #target_angle = msg.twist.angular.z
+        raw_angle = msg.twist.angular.z
+
+        # --- [MEJORA] FILTRO DE SUAVIZADO (Exponential Moving Average) ---
+        # alpha controla la suavidad:
+        # 1.0 = Sin suavizado (reacción instantánea, mucha oscilación)
+        # 0.1 = Muy suave (reacción lenta, como un barco)
+        # 0.6 es un buen equilibrio para Racing: reacciona rápido pero filtra el ruido.
+        alpha = 0.52 
+        
+        target_angle = (alpha * raw_angle) + ((1.0 - alpha) * self.last_target_angle)
+        self.last_target_angle = target_angle # Guardamos para la siguiente vez
 
         # --- LEY DE CONTROL DE DIRECCIÓN (STEERING) ---
         # Como el robot mira a 0, el error es: Deseado - Actual(0) = target_angle

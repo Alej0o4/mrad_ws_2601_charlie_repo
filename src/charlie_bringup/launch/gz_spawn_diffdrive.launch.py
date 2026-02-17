@@ -50,7 +50,7 @@ def generate_launch_description():
         arguments=[
             "-name", "diffbot",
             "-topic", "robot_description",
-            "-x", "-7.0", "-y", "-3.0", "-z", "0.5", "-Y", "-1.5708"
+            "-x", "-18.0", "-y", "4.35", "-z", "0.5", "-Y", "1.5708"
         ],
     )
 
@@ -113,7 +113,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "world",
             # default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "empty_world.sdf"),
-            default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "obstacle_track.sdf"),
+            default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "RaceTrack.sdf"),
             description="Full path to world SDF file",
         ),
         gz_launch,

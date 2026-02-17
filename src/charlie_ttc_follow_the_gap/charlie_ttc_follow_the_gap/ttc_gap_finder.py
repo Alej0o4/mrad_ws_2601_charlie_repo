@@ -78,16 +78,49 @@ class TtcGapFinder(Node):
             proc_ranges[unsafe_mask] = 0.0
         
         # 4. Burbuja de Seguridad
+        # valid_indices = np.where(proc_ranges > 0.05)[0]
+        # if len(valid_indices) > 0:
+        #     min_dist_idx = valid_indices[np.argmin(proc_ranges[valid_indices])]
+        #     min_dist = proc_ranges[min_dist_idx]
+            
+        #     safety_radius = (self.width / 2.0) + self.safety_margin 
+        #     bubble_angle = np.arctan2(safety_radius, min_dist)
+        #     angle_inc = msg.angle_increment
+        #     bubble_indices = int(bubble_angle / angle_inc)
+            
+        #     start = max(0, min_dist_idx - bubble_indices)
+        #     end = min(len(proc_ranges), min_dist_idx + bubble_indices)
+        #     proc_ranges[start:end] = 0.0
+        
         valid_indices = np.where(proc_ranges > 0.05)[0]
+        
         if len(valid_indices) > 0:
+            # Encontramos el punto más cercano (el obstáculo más peligroso)
             min_dist_idx = valid_indices[np.argmin(proc_ranges[valid_indices])]
             min_dist = proc_ranges[min_dist_idx]
             
-            safety_radius = (self.width / 2.0) + self.safety_margin 
+            # --- LÓGICA DINÁMICA ---
+            # Si el robot está en espacio abierto (> 1m), usa el margen completo.
+            # Si entra en la zona estrecha (< 1m), reduce el margen proporcionalmente.
+            # Esto evita que la burbuja sea tan grande que tape el único hueco disponible.
+            
+            if min_dist < 1.0:
+                # Escalamos el margen: A 0.5m de dist, usa el 50% del margen.
+                # Mantenemos un mínimo de 0.02m para no chocar.
+                dynamic_margin = max(0.02, self.safety_margin * (min_dist / 1.0))
+            else:
+                # Espacio abierto: usamos el margen seguro completo
+                dynamic_margin = self.safety_margin
+
+            # Calculamos el radio total (Mitad del robot + margen calculado)
+            safety_radius = (self.width / 2.0) + dynamic_margin 
+            
+            # Calculamos cuántos índices del array representa ese radio (Geometría básica)
             bubble_angle = np.arctan2(safety_radius, min_dist)
             angle_inc = msg.angle_increment
             bubble_indices = int(bubble_angle / angle_inc)
             
+            # Aplicamos la burbuja (Ponemos a 0 esos rangos)
             start = max(0, min_dist_idx - bubble_indices)
             end = min(len(proc_ranges), min_dist_idx + bubble_indices)
             proc_ranges[start:end] = 0.0
