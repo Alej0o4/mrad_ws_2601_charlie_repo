@@ -113,7 +113,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "world",
             # default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "empty_world.sdf"),
-            default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "RaceTrack.sdf"),
+            default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "RaceTrackObs.sdf"),
             description="Full path to world SDF file",
         ),
         gz_launch,
