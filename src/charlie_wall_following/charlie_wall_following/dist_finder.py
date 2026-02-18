@@ -62,7 +62,7 @@ class DistFinder(Node):
         r_dist = np.mean(right_valid) if len(right_valid) > 0 else 5.0
 
         # Example: Simple logic to favor the closer wall
-        side_threshold = 0.2
+        side_threshold = 0.8
 
         if abs(l_dist - r_dist) > side_threshold:
             if l_dist < r_dist:
@@ -72,14 +72,15 @@ class DistFinder(Node):
         # si no supera el umbral → mantener lado actual
 
 
-        self.ray_b_angle = self.desired_wall_side * np.pi/2
+        self.ray_b_angle = self.desired_wall_side * np.pi/2    
 
         front_sector = np.array(msg.ranges[int(total*0.45):int(total*0.55)])
         front_valid = front_sector[np.isfinite(front_sector)]
         front_min = np.min(front_valid) if len(front_valid) > 0 else 5.0
+        
 
-        if front_min < 1.0:
-            self.desired_wall_side = 1 if l_dist > r_dist else -1
+        # if front_min < 1.0: # Si hay un obstáculo cercano al frente, cambiar de lado
+        #     self.desired_wall_side = 1 if l_dist > r_dist else -1
 
 
 
