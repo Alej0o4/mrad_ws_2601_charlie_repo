@@ -3,7 +3,7 @@ ttc_gap_finder:
   ros__parameters:
     robot_width: 0.44       # Ancho real del robot en metros
     ttc_min: 10.6          # Segundos. Si TTC < 0.6, se considera muro
-    fov_angle: 0.96  # Campo de visión útil (1.57 rad = 90 grados a cada lado)
+    fov_angle: 1.187  # Campo de visión útil (1.57 rad = 90 grados a cada lado)
     safety_margin: 0.175    # Metros extra alrededor de obstáculos (Inflado de burbuja)
     debug_mode: True        # Si es True, se publican tópicos de depuración
 
