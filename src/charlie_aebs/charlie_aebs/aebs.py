@@ -53,6 +53,8 @@ class AEBSNode(Node):
         # --- PUBLICACIÓN ---
         self.cmd_pub = self.create_publisher(TwistStamped, '/diffdrive_controller/cmd_vel', 10)
 
+        self.u_k = 0.
+
         self.get_logger().info(f"AEBS System Active.")
 
     def update_thresholds(self):
@@ -130,6 +132,7 @@ class AEBSNode(Node):
             self.stop_robot(msg, min_ttc)
         else:
             self.u_k = msg.twist.linear.x
+            self.u_k = msg.twist.linear.x
             self.cmd_pub.publish(msg)
 
     # ---------------------------------------------------------
@@ -186,14 +189,15 @@ class AEBSNode(Node):
             f"[{self.mode.upper()}] FRENO {direction_str}! TTC: {ttc_val:.2f}s (Lim: {self.effective_ttc:.2f}s)", 
             throttle_duration_sec=0.5
         )
+        
+        alpha = 0.1
+        gain = 1.
 
-        alpha = 0.2
-
-        self.u_k = (alpha * self.u_k) + ((1.0 - alpha) * 0.0)   
+        self.u_k = alpha * self.u_k + (1 - alpha) * 0.0
         safe_msg = TwistStamped()
         safe_msg.header = original_msg.header 
-        safe_msg.twist.linear.x = self.u_k
-        safe_msg.twist.angular.z = original_msg.twist.angular.z 
+        safe_msg.twist.linear.x = self.u_k 
+        safe_msg.twist.angular.z = original_msg.twist.angular.z*gain
         
         self.cmd_pub.publish(safe_msg)
 

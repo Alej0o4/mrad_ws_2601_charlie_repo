@@ -4,6 +4,8 @@ from rclpy.node import Node
 from std_msgs.msg import Float32
 from rclpy.qos import QoSProfile
 from geometry_msgs.msg import TwistStamped
+import numpy as np
+
 
 class Control(Node): # Redefine node class
     def __init__(self):
@@ -76,7 +78,7 @@ class Control(Node): # Redefine node class
         # "Si el error sube (curva), la velocidad baja".
         # Fórmula simple: Vel = Vel_Max / (1 + abs(Giro))
         # Esto hace que si el giro es 0, vas a max_speed. Si giras mucho, frenas.
-        linear_velocity = max_speed / (1.0 + abs(angular_output))
+        linear_velocity = max_speed / (1.0 + 0.25*np.exp(np.abs(angular_output)))
 
         # 7. Publicar Comando
         cmd_msg = TwistStamped()
