@@ -53,7 +53,7 @@ class TtcControl(Node):
         # 1.0 = Sin suavizado (reacción instantánea, mucha oscilación)
         # 0.1 = Muy suave (reacción lenta, como un barco)
         # 0.6 es un buen equilibrio para Racing: reacciona rápido pero filtra el ruido.
-        alpha = 0.52 
+        alpha = 0.4
         
         target_angle = (alpha * raw_angle) + ((1.0 - alpha) * self.last_target_angle)
         self.last_target_angle = target_angle # Guardamos para la siguiente vez

@@ -104,10 +104,10 @@ class TtcGapFinder(Node):
             # Si entra en la zona estrecha (< 1m), reduce el margen proporcionalmente.
             # Esto evita que la burbuja sea tan grande que tape el único hueco disponible.
             
-            if min_dist < 1.0:
+            if min_dist < 0.5:
                 # Escalamos el margen: A 0.5m de dist, usa el 50% del margen.
                 # Mantenemos un mínimo de 0.02m para no chocar.
-                dynamic_margin = max(0.02, self.safety_margin * (min_dist / 1.0))
+                dynamic_margin = max(0.3, self.safety_margin * (min_dist / 1.0))
             else:
                 # Espacio abierto: usamos el margen seguro completo
                 dynamic_margin = self.safety_margin

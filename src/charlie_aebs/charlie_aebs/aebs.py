@@ -26,6 +26,8 @@ class AEBSNode(Node):
 
         # [NEW] Variable para el TTC efectivo (el que realmente se usa)
         self.effective_ttc = self.base_ttc 
+        self.u_k = 0.0 # Velocidad actual del robot (para suavizado)
+        self.alpha = 0.4 # Factor de suavizado para la velocidad (0.0 = sin suavizado, 1.0 = muy suave)
         
         # [NEW] Calculamos el umbral inicial según el modo configurado
         self.update_thresholds()
@@ -127,6 +129,7 @@ class AEBSNode(Node):
         if not is_safe:
             self.stop_robot(msg, min_ttc)
         else:
+            self.u_k = msg.twist.linear.x
             self.cmd_pub.publish(msg)
 
     # ---------------------------------------------------------
@@ -183,10 +186,13 @@ class AEBSNode(Node):
             f"[{self.mode.upper()}] FRENO {direction_str}! TTC: {ttc_val:.2f}s (Lim: {self.effective_ttc:.2f}s)", 
             throttle_duration_sec=0.5
         )
-        
+
+        alpha = 0.2
+
+        self.u_k = (alpha * self.u_k) + ((1.0 - alpha) * 0.0)   
         safe_msg = TwistStamped()
         safe_msg.header = original_msg.header 
-        safe_msg.twist.linear.x = 0.0
+        safe_msg.twist.linear.x = self.u_k
         safe_msg.twist.angular.z = original_msg.twist.angular.z 
         
         self.cmd_pub.publish(safe_msg)
