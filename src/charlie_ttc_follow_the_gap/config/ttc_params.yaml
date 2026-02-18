@@ -2,14 +2,14 @@
 ttc_gap_finder:
   ros__parameters:
     robot_width: 0.44       # Ancho real del robot en metros
-    ttc_min: 10.6          # Segundos. Si TTC < 0.6, se considera muro
-    fov_angle: 1.187  # Campo de visión útil (1.57 rad = 90 grados a cada lado)
-    safety_margin: 0.175    # Metros extra alrededor de obstáculos (Inflado de burbuja)
+    ttc_min: 10.2          # Segundos. Si TTC < 0.6, se considera muro
+    fov_angle: 1.292  # Campo de visión útil (1.57 rad = 90 grados a cada lado)
+    safety_margin: 0.09    # Metros extra alrededor de obstáculos (Inflado de burbuja)
     debug_mode: True        # Si es True, se publican tópicos de depuración
 
 # Parámetros para el Controlador (Acción)
 ttc_control:
   ros__parameters:
-    kp: 4.7                # Ganancia Proporcional. Alto = Giro rápido hacia el hueco
-    max_speed: 2.5        # m/s. Velocidad máxima en rectas (¡A correr!)
+    kp: 3.5                # Ganancia Proporcional. Alto = Giro rápido hacia el hueco
+    max_speed: 1.3        # m/s. Velocidad máxima en rectas (¡A correr!)
     max_steering: 1.57       # Radianes. Límite físico de tus ruedas
