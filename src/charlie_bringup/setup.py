@@ -28,6 +28,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'path_recorder = charlie_bringup.path_recorder:main',
         ],
     },
 )
