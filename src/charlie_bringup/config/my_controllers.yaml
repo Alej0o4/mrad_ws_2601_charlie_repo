@@ -20,6 +20,7 @@ diffdrive_controller:
     right_wheel_names: ['right_wheel_joint']
     wheel_separation: 0.44 # distance between wheels ${ly/2+le_w/2}*2
     wheel_radius: 0.05
+    enable_odom_tf: false
 
     # === Parámetros para suavizar el movimiento y eitar derrapes ===
     # Evita que el robot "salte" o haga "caballitos" al hacer cambios bruscos de atras hacia adelante o viceversa

@@ -246,7 +246,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        wall_follower_rays: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -374,7 +374,8 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz_default_plugins/FPS
+      Angle: 0
+      Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -383,14 +384,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5297967791557312
-      Position:
-        X: -7.0254225730896
-        Y: 1.2416324615478516
-        Z: 11.537364959716797
+      Scale: 52.40496826171875
       Target Frame: <Fixed Frame>
-      Value: FPS (rviz_default_plugins)
-      Yaw: 5.261992931365967
+      Value: TopDownOrtho (rviz_default_plugins)
+      X: 0
+      Y: 0
     Saved: ~
 Window Geometry:
   Displays:
