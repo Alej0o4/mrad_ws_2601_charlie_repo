@@ -16,6 +16,10 @@ class LineModel:
     c: float = 0.0
     start_point: tuple = (0.0, 0.0) # Vértice proyectado inicial
     end_point: tuple = (0.0, 0.0)   # Vértice proyectado final
+    
+    # --- Nuevos atributos agregados para la lógica de solapamiento ---
+    start_idx: int = -1             # Índice de inicio del segmento en el arreglo del LiDAR
+    end_idx: int = -1               # Índice de fin del segmento en el arreglo del LiDAR
 
 class LineSegment(Node):
     """
@@ -65,7 +69,7 @@ class LineSegment(Node):
         """
         # 1. Módulo de Transformación (Pre-procesamiento)
         # Convertimos los rangos polares a (x, y) ignorando valores infinitos
-        points = self.polar_to_cartesian(msg.ranges, msg.angle_min, msg.angle_increment)
+        points = self.polar_to_cartesian(msg)
         
         # Si el LiDAR no detectó casi nada, abortamos
         if len(points) < self.p_min:
@@ -586,7 +590,7 @@ class LineSegment(Node):
             # --- Configuración del Header ---
             # ¡IMPORTANTE!: Este frame_id debe coincidir exactamente con el de tu LiDAR.
             # Usualmente es 'laser_frame', 'base_laser' o 'lidar_link'.
-            marker.header.frame_id = "laser_frame" 
+            marker.header.frame_id = "lidar_link" 
             marker.header.stamp = self.get_clock().now().to_msg()
             
             # --- Identificación ---

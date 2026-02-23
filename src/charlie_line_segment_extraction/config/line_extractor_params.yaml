@@ -1,0 +1,30 @@
+line_segment_extraction_node:
+  ros__parameters:
+    # --- Parámetros de Sensibilidad del LiDAR ---
+    
+    # epsilon: Distancia máxima (en metros) perpendicular de un punto a la línea.
+    # Trade-off: Muy bajo = sub-segmentación (muchas líneas cortas). Muy alto = esquinas redondeadas.
+    epsilon: 0.04 
+
+    # delta: Distancia máxima (en metros) entre un punto medido y el proyectado.
+    # Previene que el algoritmo salte a través de puertas abiertas.
+    delta: 0.1 
+
+    # --- Parámetros de Umbral de Puntos ---
+    
+    # s_min (S_num): Número de puntos consecutivos necesarios para plantar una semilla inicial.
+    # Trade-off: Muy bajo = falsos positivos por ruido. Muy alto = ignora obstáculos pequeños.
+    s_min: 6 
+
+    # p_min (P_min): Número mínimo total de puntos para que una línea terminada sea válida.
+    # Filtra "basura" geométrica o reflejos espurios del láser.
+    p_min: 15 
+
+    # --- Parámetros de Geometría Física ---
+    
+    # l_min: Longitud física mínima (en metros) de un segmento para considerarlo una pared.
+    # Si detecta algo de 5cm, probablemente sea el pie de una silla, no una pared útil para SLAM.
+    l_min: 0.2 
+
+    # line_width: Grosor del MarkerArray en RViz2 (puramente visual).
+    line_width: 0.03
