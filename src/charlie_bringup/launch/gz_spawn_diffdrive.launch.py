@@ -14,6 +14,9 @@ def generate_launch_description():
     bringup_pkg_name = "charlie_bringup"
     description_pkg_name = "charlie_description"
 
+    aebs_pkg_name = "charlie_aebs"
+    ekf_pkg_name = "charlie_ekf"
+
     use_sim_time = LaunchConfiguration("use_sim_time")
     world = LaunchConfiguration("world")
 
@@ -102,6 +105,20 @@ def generate_launch_description():
                     parameters=[twist_mux_params,{'use_sim_time': True}],
                     remappings=[('/cmd_vel_out','/cmd_vel_raw')]
     )
+
+    aebs_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory(aebs_pkg_name), 'launch', 'aebs.launch.py')
+        )
+    )
+
+    ekf_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory(ekf_pkg_name), 'launch', 'ekf.launch.py')
+        ),
+        # Le pasamos el use_sim_time al launch del EKF para que se sincronice
+        launch_arguments={'use_sim_time': use_sim_time}.items()
+    )
    
 
     return LaunchDescription([
@@ -125,4 +142,6 @@ def generate_launch_description():
         joy_node,
         teleop_node,
         twist_mux_node,
+        aebs_launch, 
+        ekf_launch,   
     ])
