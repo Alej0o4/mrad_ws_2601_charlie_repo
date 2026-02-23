@@ -1,0 +1,12 @@
+# Parámetros para el Nodo de Extracción de Líneas (Basado en SRG)
+laser_line_extractor:
+  ros__parameters:
+    L_min: 0.4              # Longitud mínima de la línea (metros)
+    P_min: 8                # Número mínimo de puntos para considerar una línea
+    S_num: 5                # Número de puntos para formar la semilla inicial
+    epsilon: 0.05           # Umbral de distancia punto a línea (Tolerancia)
+    delta: 0.15             # Umbral de predicción de distancia entre puntos
+    min_range: 0.2          # Distancia mínima a leer del LiDAR
+    max_range: 10.0         # Distancia máxima a leer del LiDAR
+    process_interval: 0.2   # Intervalo de procesamiento (0.2s = 5Hz) para no saturar CPU
+    marker_lifetime: 10     # Tiempo (segundos) que duran las líneas en RViz
