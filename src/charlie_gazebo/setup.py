@@ -15,8 +15,8 @@ setup(
         (os.path.join('share', package_name,'worlds'), glob('worlds/*.*')),
         (os.path.join('share', package_name,'config'), glob('config/*.*')),
         (os.path.join('share', package_name,'rviz_config'), glob('rviz_config/*.*')),
-                (os.path.join('share', package_name,'models'), glob('models/*.*')),
-
+        (os.path.join('share', package_name,'models'), glob('models/*.*')),
+        (os.path.join('share', package_name,'plot_juggler'), glob('plot_juggler/*.*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
