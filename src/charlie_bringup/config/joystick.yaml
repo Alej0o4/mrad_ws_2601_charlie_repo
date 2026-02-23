@@ -4,6 +4,25 @@ joy_node:
     deadzone: 0.05
     autorepeat_rate: 20.0
 
+### Conra
+# teleop_node:
+#   ros__parameters:
+#     axis_linear:
+#       x: 1
+#     scale_linear:
+#       x: 2.0
+
+#     axis_angular:
+#       yaw: 3 # forward right # 2 on logitech and 3 on sony controller
+#     scale_angular:
+#       yaw: 3.0
+
+#     enable_button: 7
+#     require_enable_button: true
+#     publish_stamped_twist: true
+#     frame: 'teleop_twist_joy'
+
+### Alejo
 teleop_node:
   ros__parameters:
     axis_linear:
@@ -12,7 +31,7 @@ teleop_node:
       x: 2.0
 
     axis_angular:
-      yaw: 3 # forward right # 2 on logitech and 3 on sony controller
+      yaw: 2 # forward right # 2 on logitech and 3 on sony controller
     scale_angular:
       yaw: 3.0
 
