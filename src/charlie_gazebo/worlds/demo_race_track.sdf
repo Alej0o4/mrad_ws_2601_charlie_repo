@@ -74,7 +74,7 @@
         <collision name="collision">
             <geometry>
             <mesh>
-                <uri>/home/miconra/mrad_ws_2601_charlie_repo/src/charlie_gazebo/models/DemoRaceTrack.stl</uri> 
+                <uri>/home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/models/DemoRaceTrack.stl</uri> 
                 <scale>0.002 0.002 0.0005</scale>
             </mesh>
 
@@ -84,7 +84,7 @@
         <visual name="visual">
             <geometry>
             <mesh>
-                <uri>/home/miconra/mrad_ws_2601_charlie_repo/src/charlie_gazebo/models/DemoRaceTrack.stl</uri>
+                <uri>/home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/models/DemoRaceTrack.stl</uri>
                 <scale>0.002 0.002 0.0005</scale>
             </mesh>
 
