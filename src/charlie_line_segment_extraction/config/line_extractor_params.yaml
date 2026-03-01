@@ -4,11 +4,11 @@ line_segment_extraction_node:
     
     # epsilon: Distancia máxima (en metros) perpendicular de un punto a la línea.
     # Trade-off: Muy bajo = sub-segmentación (muchas líneas cortas). Muy alto = esquinas redondeadas.
-    epsilon: 0.04 
+    epsilon: 0.01 
 
     # delta: Distancia máxima (en metros) entre un punto medido y el proyectado.
     # Previene que el algoritmo salte a través de puertas abiertas.
-    delta: 0.1 
+    delta: 0.01 
 
     # --- Parámetros de Umbral de Puntos ---
     
@@ -24,7 +24,7 @@ line_segment_extraction_node:
     
     # l_min: Longitud física mínima (en metros) de un segmento para considerarlo una pared.
     # Si detecta algo de 5cm, probablemente sea el pie de una silla, no una pared útil para SLAM.
-    l_min: 0.2 
+    l_min: 0.1
 
     # line_width: Grosor del MarkerArray en RViz2 (puramente visual).
     line_width: 0.03
