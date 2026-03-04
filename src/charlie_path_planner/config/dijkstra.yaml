@@ -1,0 +1,5 @@
+charlie_path_planner_dijkstra:
+  ros__parameters:
+    occ_thresh: 100
+    robot_radius_m: 0.5
+    safety_margin_m: 0.05
