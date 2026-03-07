@@ -29,6 +29,8 @@ setup(
     entry_points={
         'console_scripts': [
             'dijkstra_node = charlie_path_planner.charlie_path_planner_dijkstra:main',
+            'dijkstra_node_v3 = charlie_path_planner.charlie_path_planner_dijkstra_v3:main',
+            'ara_star_node = charlie_path_planner.charlie_path_planner_ARA:main',
         ],
     },
 )
