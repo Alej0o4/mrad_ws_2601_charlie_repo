@@ -24,6 +24,7 @@ from typing import Tuple, Optional
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
+from nav_msgs.srv import GetPlan
 
 @dataclass
 class ARANode:
@@ -51,6 +52,8 @@ class ARAPlannerNode(Node):
         self.declare_parameter('topics.map_topic', '/map')
         self.declare_parameter('topics.goal_topic', '/goal_pose')
         self.declare_parameter('topics.path_topic', '/planned_path')
+        self.declare_parameter('plan_service', '/get_plan')
+
         self.declare_parameter('frames.base_frame', 'base_link')
         self.declare_parameter('frames.global_frame', 'map')
         self.declare_parameter('topics.debug_paths', '/ara_debug_paths')  # Nuevo tópico para rutas de depuración
@@ -83,10 +86,12 @@ class ARAPlannerNode(Node):
         goal_topic = self.get_parameter('topics.goal_topic').get_parameter_value().string_value
         path_topic = self.get_parameter('topics.path_topic').get_parameter_value().string_value
         debug_topic = self.get_parameter('topics.debug_paths').get_parameter_value().string_value
+        plan_srv_name = self.get_parameter('plan_service').get_parameter_value().string_value
 
         self.goal_sub = self.create_subscription(PoseStamped, goal_topic, self.goal_cb, 10)
         self.path_pub = self.create_publisher(Path, path_topic, 10)
         self.debug_paths_pub = self.create_publisher(MarkerArray, debug_topic, 10)
+        self.plan_srv = self.create_service(GetPlan, plan_srv_name, self.get_plan_cb)
 
         qos_map = QoSProfile(
             depth=1,
@@ -113,6 +118,7 @@ class ARAPlannerNode(Node):
             f"- Inflate Radius: {self.get_parameter('geometry.inflate_radius').get_parameter_value().double_value}")
 
         self.get_logger().info("ARA* Planner Node Iniciado y esperando el mapa...")
+        self.get_logger().info(f"Servicio de ARA* activo en: {plan_srv_name}")
 
     # =================================================================
     # CALLBACKS DE ROS 2
@@ -212,6 +218,56 @@ class ARAPlannerNode(Node):
             self.get_logger().info("¡Ruta ARA* publicada!")
         else:
             self.get_logger().error("ARA* falló al encontrar una ruta.")
+    
+    def get_plan_cb(self, request, response):
+        """
+        Callback del servicio /get_plan.
+        Recibe un Request con (start, goal) y devuelve un Response con (plan).
+        """
+        self.get_logger().info("¡Solicitud de ruta recibida por Servicio!")
+
+        if self._map is None or self._obstacles is None:
+            self.get_logger().warn("No hay mapa todavía. Rechazando solicitud.")
+            return response  # Devuelve la respuesta vacía
+
+        # 1. Extraer las poses enviadas por tu compañero
+        start_pose = request.start
+        goal_pose = request.goal
+
+        # (Opcional pero recomendado) Validación de seguridad: 
+        # Si tu compañero envió un start_pose vacío (sin frame_id),
+        # usamos el TF del robot como respaldo de emergencia.
+        if not start_pose.header.frame_id:
+            self.get_logger().warn("El Request no trajo Start Pose. Usando TF del robot...")
+            try:
+                transform = self.tf_buffer.lookup_transform(
+                    self.get_parameter('global_frame').value,
+                    self.get_parameter('base_frame').value,
+                    rclpy.time.Time()
+                )
+                start_pose.header.frame_id = self.get_parameter('global_frame').value
+                start_pose.pose.position.x = transform.transform.translation.x
+                start_pose.pose.position.y = transform.transform.translation.y
+            except Exception as e:
+                self.get_logger().error(f"Error TF de emergencia: {e}")
+                return response
+
+        # 2. ¡Llamar a tu motor matemático intacto!
+        path_msg = self.plan_ara_star(start_pose, goal_pose)
+
+        # 3. Empaquetar y devolver la respuesta
+        if path_msg is not None:
+            response.plan = path_msg
+            
+            # También lo publicamos en el tópico normal para que 
+            # lo puedas ver dibujado en RViz mientras tu compañero hace sus pruebas
+            self.path_pub.publish(path_msg)
+            
+            self.get_logger().info("¡Ruta calculada con éxito y devuelta al cliente!")
+        else:
+            self.get_logger().error("ARA* falló al encontrar una ruta para el servicio.")
+
+        return response
 
     # =================================================================
     # 4. FUNCIONES AUXILIARES 
