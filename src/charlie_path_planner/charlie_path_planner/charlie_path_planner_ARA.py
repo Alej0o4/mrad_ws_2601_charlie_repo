@@ -21,6 +21,9 @@ from tf2_geometry_msgs import do_transform_pose
 import tf2_ros
 from dataclasses import dataclass, field
 from typing import Tuple, Optional
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point
+from std_msgs.msg import ColorRGBA
 
 @dataclass
 class ARANode:
@@ -45,26 +48,30 @@ class ARAPlannerNode(Node):
         super().__init__('ara_planner_node')
 
         # --- Parámetros de ROS 2 (Reciclados de Dijkstra) ---
-        self.declare_parameter('map_topic', '/map')
-        self.declare_parameter('goal_topic', '/goal_pose')
-        self.declare_parameter('path_topic', '/planned_path')
-        self.declare_parameter('base_frame', 'base_link')
-        self.declare_parameter('global_frame', 'map')
+        self.declare_parameter('topics.map_topic', '/map')
+        self.declare_parameter('topics.goal_topic', '/goal_pose')
+        self.declare_parameter('topics.path_topic', '/planned_path')
+        self.declare_parameter('frames.base_frame', 'base_link')
+        self.declare_parameter('frames.global_frame', 'map')
+        self.declare_parameter('topics.debug_paths', '/ara_debug_paths')  # Nuevo tópico para rutas de depuración
         
         # Opciones de grilla
-        self.declare_parameter('occupied_threshold', 65)
-        self.declare_parameter('use_8_connected', True)
-        self.declare_parameter('inflate_radius', 0.15)
-        self.declare_parameter('treat_unknown_as_obstacle', True)
+        self.declare_parameter('geometry.occupied_threshold', 65)
+        self.declare_parameter('geometry.use_8_connected', True)
+        self.declare_parameter('geometry.inflate_radius', 0.15)
+        self.declare_parameter('geometry.treat_unknown_as_obstacle', True)
 
         # --- Parámetros NUEVOS para ARA* ---
-        self.declare_parameter('epsilon_start', 2.5)       # Inflación inicial (Modo rápido)
-        self.declare_parameter('epsilon_decrease', 0.5)    # Cuánto baja en cada iteración
-        self.declare_parameter('time_limit_sec', 0.5)      # Presupuesto de tiempo total
-        self.declare_parameter('heuristic_type', 'euclidean')
+        self.declare_parameter('ara_core.epsilon_start', 2.5)       # Inflación inicial (Modo rápido)
+        self.declare_parameter('ara_core.epsilon_decrease', 0.5)    # Cuánto baja en cada iteración
+        self.declare_parameter('ara_core.time_limit_sec', 0.5)      # Presupuesto de tiempo total
+        self.declare_parameter('ara_core.heuristic_type', 'euclidean')
 
-        self._heuristic_type = self.get_parameter('heuristic_type').get_parameter_value().string_value.lower()
-        self._use_8_conn = self.get_parameter('use_8_connected').get_parameter_value().bool_value
+        self.declare_parameter('debug.publish_all_paths', False)
+        self._debug_mode = self.get_parameter('debug.publish_all_paths').get_parameter_value().bool_value      
+
+        self._heuristic_type = self.get_parameter('ara_core.heuristic_type').get_parameter_value().string_value.lower()
+        self._use_8_conn = self.get_parameter('geometry.use_8_connected').get_parameter_value().bool_value
 
         # PRE-CALCULAR LOS MOVIMIENTOS UNA SOLA VEZ
         straight_moves = [(0, 1, 1.0), (0, -1, 1.0), (1, 0, 1.0), (-1, 0, 1.0)]
@@ -72,12 +79,14 @@ class ARAPlannerNode(Node):
         self._allowed_moves = straight_moves + diagonal_moves if self._use_8_conn else straight_moves
 
         # --- Subscripciones y Publicadores ---
-        map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
-        goal_topic = self.get_parameter('goal_topic').get_parameter_value().string_value
-        path_topic = self.get_parameter('path_topic').get_parameter_value().string_value
+        map_topic = self.get_parameter('topics.map_topic').get_parameter_value().string_value
+        goal_topic = self.get_parameter('topics.goal_topic').get_parameter_value().string_value
+        path_topic = self.get_parameter('topics.path_topic').get_parameter_value().string_value
+        debug_topic = self.get_parameter('topics.debug_paths').get_parameter_value().string_value
 
         self.goal_sub = self.create_subscription(PoseStamped, goal_topic, self.goal_cb, 10)
         self.path_pub = self.create_publisher(Path, path_topic, 10)
+        self.debug_paths_pub = self.create_publisher(MarkerArray, debug_topic, 10)
 
         qos_map = QoSProfile(
             depth=1,
@@ -94,13 +103,14 @@ class ARAPlannerNode(Node):
         self._map: Optional[OccupancyGrid] = None
         self._obstacles: Optional[np.ndarray] = None
         self._dist_cells: Optional[np.ndarray] = None
-        self.get_logger().info("ARA* Planner Node Iniciado con los siguientes parámetros:" \
-        f"- Epsilon Start: {self.get_parameter('epsilon_start').get_parameter_value().double_value}" \
-        f"- Epsilon Decrease: {self.get_parameter('epsilon_decrease').get_parameter_value().double_value}" \
-        f"- Time Limit (sec): {self.get_parameter('time_limit_sec').get_parameter_value().double_value}" \
-        f"- Heuristic Type: {self.get_parameter('heuristic_type').get_parameter_value().string_value}" \
-        f"- Use 8-Connected: {self.get_parameter('use_8_connected').get_parameter_value().bool_value}" \
-        f"- Inflate Radius: {self.get_parameter('inflate_radius').get_parameter_value().double_value}")
+        if self._debug_mode:
+            self.get_logger().info("ARA* Planner Node Iniciado con los siguientes parámetros:" \
+            f"- Epsilon Start: {self.get_parameter('ara_core.epsilon_start').get_parameter_value().double_value}" \
+            f"- Epsilon Decrease: {self.get_parameter('ara_core.epsilon_decrease').get_parameter_value().double_value}" \
+            f"- Time Limit (sec): {self.get_parameter('ara_core.time_limit_sec').get_parameter_value().double_value}" \
+            f"- Heuristic Type: {self.get_parameter('ara_core.heuristic_type').get_parameter_value().string_value}" \
+            f"- Use 8-Connected: {self.get_parameter('geometry.use_8_connected').get_parameter_value().bool_value}" \
+            f"- Inflate Radius: {self.get_parameter('geometry.inflate_radius').get_parameter_value().double_value}")
 
         self.get_logger().info("ARA* Planner Node Iniciado y esperando el mapa...")
 
@@ -117,8 +127,8 @@ class ARAPlannerNode(Node):
         grid = np.array(msg.data, dtype=np.int16).reshape((H, W))  # row-major: y first
         self._grid = grid
 
-        occ_th = self.get_parameter('occupied_threshold').get_parameter_value().integer_value
-        unknown_as_obs = self.get_parameter('treat_unknown_as_obstacle').get_parameter_value().bool_value
+        occ_th = self.get_parameter('geometry.occupied_threshold').get_parameter_value().integer_value
+        unknown_as_obs = self.get_parameter('geometry.treat_unknown_as_obstacle').get_parameter_value().bool_value
 
         obstacles = (grid >= occ_th)
         if unknown_as_obs:
@@ -130,7 +140,7 @@ class ARAPlannerNode(Node):
         self._dist_cells = dist_cells
 
         # Inflate obstacles if requested (uses distance field: dist <= R).
-        inflate_radius = float(self.get_parameter('inflate_radius').get_parameter_value().double_value)
+        inflate_radius = float(self.get_parameter('geometry.inflate_radius').get_parameter_value().double_value)
         if inflate_radius > 1e-6:
             inflation_cells = int(math.ceil(inflate_radius / res))
             obstacles = np.logical_or(obstacles, dist_cells <= inflation_cells)
@@ -179,13 +189,13 @@ class ARAPlannerNode(Node):
         # 1. Obtener la posición actual del robot (Start)
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.get_parameter('global_frame').value,
-                self.get_parameter('base_frame').value,
+                self.get_parameter('frames.global_frame').value,
+                self.get_parameter('frames.base_frame').value,
                 rclpy.time.Time()
             )
             # Crear PoseStamped temporal para el inicio
             start_pose = PoseStamped()
-            start_pose.header.frame_id = self.get_parameter('global_frame').value
+            start_pose.header.frame_id = self.get_parameter('frames.global_frame').value
             start_pose.pose.position.x = transform.transform.translation.x
             start_pose.pose.position.y = transform.transform.translation.y
             
@@ -416,9 +426,9 @@ class ARAPlannerNode(Node):
             return None
 
         # 3. Inicializar parámetros del ARA*
-        epsilon = self.get_parameter('epsilon_start').value
-        eps_dec = self.get_parameter('epsilon_decrease').value
-        time_limit = self.get_parameter('time_limit_sec').value
+        epsilon = self.get_parameter('ara_core.epsilon_start').value
+        eps_dec = self.get_parameter('ara_core.epsilon_decrease').value
+        time_limit = self.get_parameter('ara_core.time_limit_sec').value
 
         # 4. Inicializar estructuras de datos (Las tres listas y el State Space)
         OPEN = []       # Cola de prioridad (heapq)
@@ -443,6 +453,9 @@ class ARAPlannerNode(Node):
         start_time = time.time()
         best_path_found = False
 
+        debug_markers = MarkerArray()
+        iteration_count = 0
+
         while epsilon >= 1.0:
             self.get_logger().info(f"Buscando ruta con epsilon={epsilon:.2f}...")
             
@@ -453,6 +466,22 @@ class ARAPlannerNode(Node):
             if g_idx in state_space and state_space[g_idx].g < float('inf'):
                 best_path_found = True
                 self.get_logger().info(f"¡Ruta subóptima encontrada para eps={epsilon:.2f}!")
+                if self._debug_mode:
+                    # Hacemos un mini-backtracking solo de celdas
+                    curr = g_idx
+                    cells = []
+                    while curr is not None:
+                        cells.append(curr)
+                        if curr == s_idx: break
+                        curr = state_space[curr].parent
+                    
+                    # Crear el marcador visual y guardarlo
+                    marker = self.create_path_marker(
+                        cells, epsilon, iteration_count, 
+                        start.header.frame_id, x0, y0, res
+                    )
+                    debug_markers.markers.append(marker)
+                    iteration_count += 1
             
             # Revisar si se nos acabó el tiempo
             if (time.time() - start_time) > time_limit:
@@ -496,14 +525,60 @@ class ARAPlannerNode(Node):
             CLOSED.clear()
             # (Opcional) Reconstruir OPEN completamente para actualizar 
             # las prioridades F(s) de los nodos que ya estaban adentro.
-            pass
 
         # 6. Reconstruir la ruta y retornar
+
+        if self._debug_mode and debug_markers.markers:
+            # Añadimos un marcador especial para borrar líneas de metas anteriores
+            delete_marker = Marker()
+            delete_marker.action = Marker.DELETEALL
+            debug_markers.markers.insert(0, delete_marker)
+            
+            self.debug_paths_pub.publish(debug_markers)
+
         if best_path_found:
             return self.reconstruct_path(s_idx, g_idx, state_space, start.header, x0, y0, res)
         else:
             return None
 
+
+    # =================================================================
+    # 6. FUNCIONES DE DEPURACIÓN (Opcional, para visualizar rutas subóptimas en RViz)
+    # =================================================================
+
+    def create_path_marker(self, path_cells: List[Tuple[int, int]], epsilon: float, 
+                           marker_id: int, frame_id: str, x0: float, y0: float, res: float) -> Marker:
+        marker = Marker()
+        marker.header.frame_id = frame_id
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "ara_eps_paths"
+        marker.id = marker_id
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+        
+        # Grosor de la línea
+        marker.scale.x = 0.01 
+        
+        # Lógica de Color (Rojo = subóptimo, Verde = óptimo)
+        eps_start = self.get_parameter('ara_core.epsilon_start').value
+        ratio = (epsilon - 1.0) / max((eps_start - 1.0), 0.01) # De 1.0 (Rojo) a 0.0 (Verde)
+        
+        marker.color = ColorRGBA()
+        marker.color.r = max(0.0, min(1.0, float(ratio)))        # Más rojo si epsilon es alto
+        marker.color.g = max(0.0, min(1.0, float(1.0 - ratio)))  # Más verde si epsilon se acerca a 1
+        marker.color.b = 0.0
+        marker.color.a = 0.8  # Ligeramente transparente
+
+        # Convertir celdas a puntos 3D
+        for ix, iy in path_cells:
+            x, y = self.map_to_world(ix, iy, x0, y0, res)
+            p = Point()
+            p.x, p.y = x, y
+
+            p.z = marker_id * 0.02
+            marker.points.append(p)
+            
+        return marker
 
 def main(args=None):
     rclpy.init(args=args)

@@ -1,25 +1,26 @@
 ara_star_node:
   ros__parameters:
-    # ---------------------------------------------------------
-    # Tópicos y Frames (Interfaces de ROS 2)
-    # ---------------------------------------------------------
-    map_topic: "/map"
-    goal_topic: "/goal_pose"
-    path_topic: "/planned_path"
-    base_frame: "base_link"
-    global_frame: "map"
-
-    # ---------------------------------------------------------
-    # Geometría y Cuadrícula
-    # ---------------------------------------------------------
-    occupied_threshold: 65     # Valor de 0-100 a partir del cual se considera obstáculo
-    use_8_connected: true  # true = permite diagonales, false = solo cruz (Manhattan)
-    inflate_radius: 0.24       # Radio de inflación de obstáculos en metros
-    treat_unknown_as_obstacle: true   # true = no entra en zonas no exploradas
-    # ---------------------------------------------------------
-    # Parámetros Core del Algoritmo ARA*
-    # ---------------------------------------------------------
-    epsilon_start: 2.5         # Factor de inflación inicial (Comportamiento "Pánico/Rápido")
-    epsilon_decrease: 0.5      # Cuánto se reduce epsilon por cada iteración de mejora
-    time_limit_sec: 0.5        # Presupuesto máximo de tiempo en segundos para buscar
-    heuristic_type: "euclidean" # Tipo de heurística: "euclidean", "manhattan" o "diagonal"
+    topics:
+      map: "/map"
+      goal: "/goal_pose"
+      path: "/planned_path"
+      debug_paths: "~/debug/all_epsilon_paths" # Tópico privado del nodo
+    
+    frames:
+      base: "base_link"
+      global: "map"
+      
+    geometry:
+      occupied_threshold: 65
+      use_8_connected: true
+      inflate_radius: 0.24
+      treat_unknown_as_obstacle: true
+      
+    ara_core:
+      epsilon_start: 2.5
+      epsilon_decrease: 0.5
+      time_limit_sec: 5.0
+      heuristic_type: "euclidean"
+      
+    debug:
+      publish_all_paths: true  # ¡Tu nuevo parámetro de verbosity!
