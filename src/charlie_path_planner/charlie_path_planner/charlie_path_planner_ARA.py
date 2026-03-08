@@ -34,6 +34,11 @@ class ARANode:
     def __lt__(self, other):
         return False
 
+def yaw_to_quaternion(yaw: float) -> Quaternion:
+    q = Quaternion()
+    q.w = math.cos(yaw / 2.0)
+    q.z = math.sin(yaw / 2.0)
+    return q
 
 class ARAPlannerNode(Node):
     def __init__(self):
@@ -50,11 +55,21 @@ class ARAPlannerNode(Node):
         self.declare_parameter('occupied_threshold', 65)
         self.declare_parameter('use_8_connected', True)
         self.declare_parameter('inflate_radius', 0.15)
+        self.declare_parameter('treat_unknown_as_obstacle', True)
 
         # --- Parámetros NUEVOS para ARA* ---
         self.declare_parameter('epsilon_start', 2.5)       # Inflación inicial (Modo rápido)
         self.declare_parameter('epsilon_decrease', 0.5)    # Cuánto baja en cada iteración
         self.declare_parameter('time_limit_sec', 0.5)      # Presupuesto de tiempo total
+        self.declare_parameter('heuristic_type', 'euclidean')
+
+        self._heuristic_type = self.get_parameter('heuristic_type').get_parameter_value().string_value.lower()
+        self._use_8_conn = self.get_parameter('use_8_connected').get_parameter_value().bool_value
+
+        # PRE-CALCULAR LOS MOVIMIENTOS UNA SOLA VEZ
+        straight_moves = [(0, 1, 1.0), (0, -1, 1.0), (1, 0, 1.0), (-1, 0, 1.0)]
+        diagonal_moves = [(1, 1, 1.4142), (-1, 1, 1.4142), (1, -1, 1.4142), (-1, -1, 1.4142)]
+        self._allowed_moves = straight_moves + diagonal_moves if self._use_8_conn else straight_moves
 
         # --- Subscripciones y Publicadores ---
         map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
@@ -79,21 +94,81 @@ class ARAPlannerNode(Node):
         self._map: Optional[OccupancyGrid] = None
         self._obstacles: Optional[np.ndarray] = None
         self._dist_cells: Optional[np.ndarray] = None
+        self.get_logger().info("ARA* Planner Node Iniciado con los siguientes parámetros:" \
+        f"- Epsilon Start: {self.get_parameter('epsilon_start').get_parameter_value().double_value}" \
+        f"- Epsilon Decrease: {self.get_parameter('epsilon_decrease').get_parameter_value().double_value}" \
+        f"- Time Limit (sec): {self.get_parameter('time_limit_sec').get_parameter_value().double_value}" \
+        f"- Heuristic Type: {self.get_parameter('heuristic_type').get_parameter_value().string_value}" \
+        f"- Use 8-Connected: {self.get_parameter('use_8_connected').get_parameter_value().bool_value}" \
+        f"- Inflate Radius: {self.get_parameter('inflate_radius').get_parameter_value().double_value}")
 
         self.get_logger().info("ARA* Planner Node Iniciado y esperando el mapa...")
 
     # =================================================================
-    # CALLBACKS DE ROS 2 (Reciclados - Mismo flujo que Dijkstra)
+    # CALLBACKS DE ROS 2
     # =================================================================
     def map_cb(self, msg: OccupancyGrid):
         """Recibe el mapa, lo guarda y pre-calcula los obstáculos (Brushfire)."""
-        # [COPIA EXACTA DE LA FUNCIÓN map_cb DE TU SCRIPT DIJKSTRA]
-        pass
+        self._map = msg
+        W = msg.info.width
+        H = msg.info.height
+        res = msg.info.resolution
+
+        grid = np.array(msg.data, dtype=np.int16).reshape((H, W))  # row-major: y first
+        self._grid = grid
+
+        occ_th = self.get_parameter('occupied_threshold').get_parameter_value().integer_value
+        unknown_as_obs = self.get_parameter('treat_unknown_as_obstacle').get_parameter_value().bool_value
+
+        obstacles = (grid >= occ_th)
+        if unknown_as_obs:
+            obstacles = np.logical_or(obstacles, grid == -1)
+
+        # Precompute distance-to-obstacle field (in cells) from the raw obstacles.
+        # This is useful for both inflation and soft traversal costs.
+        dist_cells = self.compute_distance_to_obstacles(obstacles)
+        self._dist_cells = dist_cells
+
+        # Inflate obstacles if requested (uses distance field: dist <= R).
+        inflate_radius = float(self.get_parameter('inflate_radius').get_parameter_value().double_value)
+        if inflate_radius > 1e-6:
+            inflation_cells = int(math.ceil(inflate_radius / res))
+            obstacles = np.logical_or(obstacles, dist_cells <= inflation_cells)
+
+        self._obstacles = obstacles
+        self.get_logger().info(f'Map received: {W}x{H}, res={res:.3f} m/px')
 
     def compute_distance_to_obstacles(self, obstacles: np.ndarray) -> np.ndarray:
-        """Usado para inflar paredes si es necesario."""
-        # [COPIA EXACTA DE LA FUNCIÓN DE TU SCRIPT DIJKSTRA]
-        pass
+        """Brushfire / multi-source BFS distance transform (4-connected).
+
+        Returns dist[y,x] in *cells* to the nearest obstacle cell.
+        Obstacle cells have distance 0.
+        """
+        H, W = obstacles.shape
+        INF = np.iinfo(np.int32).max
+        dist = np.full((H, W), INF, dtype=np.int32)
+
+        q = deque()
+        ys, xs = np.nonzero(obstacles)
+        for y, x in zip(ys, xs):
+            dist[y, x] = 0
+            q.append((x, y))
+
+        # If there are no obstacles, dist stays INF everywhere.
+        if not q:
+            return dist
+
+        nbr4 = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        while q:
+            x, y = q.popleft()
+            d = dist[y, x]
+            nd = d + 1
+            for dx, dy in nbr4:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < W and 0 <= ny < H and dist[ny, nx] > nd:
+                    dist[ny, nx] = nd
+                    q.append((nx, ny))
+        return dist
 
     def goal_cb(self, msg: PoseStamped):
         """Se activa al recibir una meta en RViz. Aquí arranca el ARA*."""
@@ -132,46 +207,194 @@ class ARAPlannerNode(Node):
     # 4. FUNCIONES AUXILIARES 
     # =================================================================
     def world_to_map(self, x, y, x0, y0, res, W, H) -> Optional[Tuple[int, int]]:
-        # [COPIA EXACTA DE DIJKSTRA]
-        pass
+        """World (meters) -> grid indices (ix, iy)."""
+        ix = int(math.floor((x - x0) / res))
+        iy = int(math.floor((y - y0) / res))
+        if 0 <= ix < W and 0 <= iy < H:
+            return ix, iy
+        return None
 
     def map_to_world(self, ix, iy, x0, y0, res) -> Tuple[float, float]:
-        # [COPIA EXACTA DE DIJKSTRA]
-        pass
+        """Grid indices -> world (meters), at cell center."""
+        x = x0 + (ix + 0.5) * res
+        y = y0 + (iy + 0.5) * res
+        return x, y
 
-    def get_neighbors(self, ix, iy, W, H) -> List[Tuple[int, int, float]]:
-        """Retorna vecinos válidos y el costo de transición c(s, s')"""
-        # [COPIA EXACTA DE DIJKSTRA]
-        pass
+    def get_neighbors(self, ix: int, iy: int, W: int, H: int) -> List[Tuple[int, int, float]]:
+        neighbors = []
+        
+        # Iteramos sobre la lista en memoria, sin crear nuevas listas ni llamar parámetros ROS2
+        for dx, dy, cost in self._allowed_moves:
+            nx = ix + dx
+            ny = iy + dy
+
+            if 0 <= nx < W and 0 <= ny < H:
+                if not self._obstacles[ny, nx]:
+                    # Chequeo de cruce de esquina (opcional)
+                    if abs(dx) == 1 and abs(dy) == 1:
+                        if self._obstacles[iy, nx] or self._obstacles[ny, ix]:
+                            continue
+                    
+                    neighbors.append((nx, ny, cost))
+        return neighbors
 
     # =================================================================
-    # 5. EL NÚCLEO MATEMÁTICO ARA* (Funciones COMPLETAMENTE NUEVAS)
+    # 5. EL NÚCLEO MATEMÁTICO ARA* 
     # =================================================================
     def calculate_heuristic(self, curr_idx: Tuple[int, int], goal_idx: Tuple[int, int]) -> float:
         """
         Calcula la estimación h(s) desde el nodo actual a la meta.
         Puedes usar distancia Euclidiana o Manhattan.
         """
-        pass
+        # Distancia absoluta en X y en Y
+        dx = abs(curr_idx[0] - goal_idx[0])
+        dy = abs(curr_idx[1] - goal_idx[1])
+
+        if self._heuristic_type == 'manhattan':
+            # Distancia Manhattan: Solo permite movimientos en cruz (L)
+            # h(s) = |dx| + |dy|
+            return float(dx + dy)
+            
+        else:
+            # Distancia Euclidiana (Por defecto): Línea recta
+            # Usamos math.hypot que es más rápido y numéricamente más estable que sqrt(dx**2 + dy**2)
+            return math.hypot(dx, dy)
 
     def f_value(self, g: float, h: float, epsilon: float) -> float:
         """Retorna el costo total estimado: f(s) = g(s) + epsilon * h(s)"""
-        pass
+        return g + (epsilon * h)
 
-    def improve_path(self, goal_idx, epsilon, state_space, OPEN, CLOSED, INCONS):
+    def improve_path(self, goal_idx: Tuple[int, int], epsilon: float, 
+                     state_space: Dict[Tuple[int, int], 'ARANode'], 
+                     OPEN: list, CLOSED: set, INCONS: set):
         """
-        El equivalente al bucle interno de Dijkstra. 
-        Expande nodos de OPEN mientras f(goal) > min(f(s) en OPEN).
-        Actualiza g(s), v(s) y manda nodos a INCONS si es necesario.
+        El núcleo de ARA*. Expande nodos hasta que la meta esté garantizada
+        para el factor de inflación epsilon actual.
         """
-        pass
+        # 1. Obtener dimensiones del mapa para los vecinos
+        W = self._map.info.width
+        H = self._map.info.height
+
+        # Asegurarnos de que la meta exista en el state_space para poder evaluar su g(s)
+        if goal_idx not in state_space:
+            state_space[goal_idx] = ARANode(goal_idx[0], goal_idx[1])
+
+        # =================================================================
+        # BUCLE PRINCIPAL (Línea 13 del paper)
+        # Condición: Mientras OPEN no esté vacío Y g(meta) > mínimo f(s) en OPEN
+        # Nota: f(meta) es igual a g(meta) porque la heurística h(meta) es 0.
+        # OPEN[0][0] nos da el f(s) más pequeño actualmente en el min-heap.
+        # =================================================================
+        while OPEN and state_space[goal_idx].g > OPEN[0][0]:
+            
+            # Línea 14: Remover el nodo con menor f(s)
+            current_f, current_idx = heapq.heappop(OPEN)
+
+            # --- LAZY DELETION ---
+            # Si este nodo ya fue expandido en esta iteración, es un "fantasma" 
+            # de una actualización anterior. Lo ignoramos.
+            if current_idx in CLOSED:
+                continue
+
+            current_node = state_space[current_idx]
+
+            # Línea 15: v(s) = g(s) (Hacer el nodo "Consistente")
+            current_node.v = current_node.g
+            
+            # Línea 16: Meterlo a CLOSED
+            CLOSED.add(current_idx)
+
+            # Línea 17: Para cada vecino s' del nodo s
+            neighbors = self.get_neighbors(current_idx[0], current_idx[1], W, H)
+            
+            for nx, ny, transition_cost in neighbors:
+                neighbor_idx = (nx, ny)
+                
+                # Inicialización "On-the-fly" (Crear el nodo si no lo habíamos visto nunca)
+                if neighbor_idx not in state_space:
+                    state_space[neighbor_idx] = ARANode(nx, ny)
+                
+                neighbor_node = state_space[neighbor_idx]
+
+                # Línea 18: ¿Encontramos un atajo? si g(s') > g(s) + c(s, s')
+                new_g = current_node.g + transition_cost
+                
+                if neighbor_node.g > new_g:
+                    
+                    # Línea 19: Actualizamos el peso y guardamos el rastro (Parent)
+                    neighbor_node.g = new_g
+                    neighbor_node.parent = current_idx 
+
+                    # Línea 20: ¿s' NO está en CLOSED?
+                    if neighbor_idx not in CLOSED:
+                        # Línea 21: Insertar (o actualizar "lazy") s' en OPEN
+                        h_val = self.calculate_heuristic(neighbor_idx, goal_idx)
+                        new_f = self.f_value(new_g, h_val, epsilon)
+                        heapq.heappush(OPEN, (new_f, neighbor_idx))
+                    
+                    # Línea 22: else (s' SI está en CLOSED, o sea, ya lo habíamos procesado)
+                    else:
+                        # Línea 23: Insertar s' en INCONS
+                        INCONS.add(neighbor_idx)
 
     def reconstruct_path(self, start_idx, goal_idx, state_space, path_msg_header, x0, y0, res) -> Path:
         """
         Navega hacia atrás usando state_space[nodo].parent para 
         construir el mensaje nav_msgs/Path a publicar en RViz.
         """
-        pass
+        # Crear el mensaje de ROS 2 vacío
+        path_msg = Path()
+        path_msg.header = path_msg_header
+
+        # ==========================================================
+        # 1. Backtracking: Recuperar los índices de la meta al inicio
+        # ==========================================================
+        current_idx = goal_idx
+        path_cells = []
+
+        # Retroceder por los padres hasta llegar a None o al inicio
+        while current_idx is not None:
+            path_cells.append(current_idx)
+            if current_idx == start_idx:
+                break
+            current_idx = state_space[current_idx].parent
+
+        # Como la lista se construyó desde la meta, la invertimos (Inicio -> Meta)
+        path_cells.reverse()
+
+        # ==========================================================
+        # 2. Traducción: Matriz -> Mundo Real (Metros)
+        # ==========================================================
+        last_yaw = 0.0  # Ángulo por defecto
+        
+        for i, (ix, iy) in enumerate(path_cells):
+            # Obtener el centro físico de la celda (usando la función que vimos antes)
+            x, y = self.map_to_world(ix, iy, x0, y0, res)
+            
+            pose = PoseStamped()
+            pose.header = path_msg_header
+            pose.pose.position.x = x
+            pose.pose.position.y = y
+            pose.pose.position.z = 0.0
+
+            # ==========================================================
+            # 3. Orientación Cinemática (Cálculo del Yaw)
+            # ==========================================================
+            # Miramos el siguiente punto de la ruta para saber hacia dónde mirar
+            if i + 1 < len(path_cells):
+                next_ix, next_iy = path_cells[i + 1]
+                nx_world, ny_world = self.map_to_world(next_ix, next_iy, x0, y0, res)
+                
+                # math.atan2 calcula el ángulo del vector entre el punto actual y el siguiente
+                last_yaw = math.atan2(ny_world - y, nx_world - x)
+            
+            # Convertimos el ángulo Yaw de Euler a Cuaternión (Requisito de ROS 2)
+            pose.pose.orientation = yaw_to_quaternion(last_yaw)
+            
+            # Añadir la pose al arreglo final del mensaje Path
+            path_msg.poses.append(pose)
+
+        return path_msg
 
     def plan_ara_star(self, start: PoseStamped, goal: PoseStamped) -> Optional[Path]:
         """
@@ -245,14 +468,32 @@ class ARAPlannerNode(Node):
             if epsilon < 1.0:
                 epsilon = 1.0
 
-            # Mover INCONS a OPEN
-            for node_idx in INCONS:
-                # Recalcular F con el nuevo epsilon y pushear a OPEN
-                pass
+            # VACIAR INCONS DENTRO DE OPEN Y RECONSTRUIR EL HEAP
+            # Necesitamos recalcular f(s) = g(s) + epsilon * h(s) para TODOS los nodos latentes
             
+            new_open_list = []
+            
+            # 1. Recalcular nodos que ya estaban en OPEN
+            for _, idx in OPEN:
+                # Evitar nodos marcados como lazy deletion
+                if idx not in CLOSED:
+                    h_val = self.calculate_heuristic(idx, g_idx)
+                    new_f = self.f_value(state_space[idx].g, h_val, epsilon)
+                    new_open_list.append((new_f, idx))
+            
+            # 2. Recalcular y agregar nodos de la lista INCONS
+            for idx in INCONS:
+                h_val = self.calculate_heuristic(idx, g_idx)
+                new_f = self.f_value(state_space[idx].g, h_val, epsilon)
+                new_open_list.append((new_f, idx))
+
+            # 3. Restaurar las propiedades de la cola de prioridad O(N)
+            heapq.heapify(new_open_list)
+            OPEN = new_open_list
+            
+            # 4. Limpiar para la siguiente iteración
             INCONS.clear()
             CLOSED.clear()
-
             # (Opcional) Reconstruir OPEN completamente para actualizar 
             # las prioridades F(s) de los nodos que ya estaban adentro.
             pass

@@ -17,8 +17,8 @@ def generate_launch_description():
     # 3. Definir el nodo y pasarle el archivo de parámetros
     ara_planner_node = Node(
         package=pkg_name,
-        executable='ara_planner_executable', # <-- ¡Ojo! Este debe ser el nombre definido en tu setup.py
-        name='ara_planner_node',
+        executable='ara_star_node', # <-- ¡Ojo! Este debe ser el nombre definido en tu setup.py
+        name='ara_star_node',
         output='screen',
         parameters=[config_file_path]
     )

@@ -1,4 +1,4 @@
-ara_planner_node:
+ara_star_node:
   ros__parameters:
     # ---------------------------------------------------------
     # Tópicos y Frames (Interfaces de ROS 2)
@@ -13,12 +13,13 @@ ara_planner_node:
     # Geometría y Cuadrícula
     # ---------------------------------------------------------
     occupied_threshold: 65     # Valor de 0-100 a partir del cual se considera obstáculo
-    use_8_connected: true      # true = permite diagonales, false = solo cruz (Manhattan)
-    inflate_radius: 0.15       # Radio de inflación de obstáculos en metros
-
+    use_8_connected: true  # true = permite diagonales, false = solo cruz (Manhattan)
+    inflate_radius: 0.24       # Radio de inflación de obstáculos en metros
+    treat_unknown_as_obstacle: true   # true = no entra en zonas no exploradas
     # ---------------------------------------------------------
     # Parámetros Core del Algoritmo ARA*
     # ---------------------------------------------------------
     epsilon_start: 2.5         # Factor de inflación inicial (Comportamiento "Pánico/Rápido")
     epsilon_decrease: 0.5      # Cuánto se reduce epsilon por cada iteración de mejora
     time_limit_sec: 0.5        # Presupuesto máximo de tiempo en segundos para buscar
+    heuristic_type: "euclidean" # Tipo de heurística: "euclidean", "manhattan" o "diagonal"
