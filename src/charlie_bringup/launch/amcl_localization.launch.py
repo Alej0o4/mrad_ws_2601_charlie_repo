@@ -23,6 +23,8 @@ from launch.conditions import IfCondition
 from launch.substitutions import EqualsSubstitution
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.substitutions import NotEqualsSubstitution
+from launch.substitutions import PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import LoadComposableNodes, SetParameter
 from launch_ros.actions import Node
 from launch_ros.descriptions import ComposableNode, ParameterFile
@@ -72,14 +74,27 @@ def generate_launch_description():
         'namespace', default_value='', description='Top-level namespace'
     )
 
-    declare_map_yaml_cmd = DeclareLaunchArgument(
-        'map', default_value='', description='Full path to map yaml file to load'
+    declare_map_name_cmd = DeclareLaunchArgument(
+        'map_name',
+        default_value='walls_world2',
+        description='Nombre del mapa a cargar (sin la extension .yaml)',
+        choices=['walls_world2', 'RaceTrack', 'RaceTrackObs', 'demo_race_track', 'map2', 'walls_practice']
     )
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         'use_sim_time',
         default_value='false',
         description='Use simulation (Gazebo) clock if true',
+    )
+
+    declare_map_yaml_cmd = DeclareLaunchArgument(
+        'map', 
+        default_value=PathJoinSubstitution([
+            FindPackageShare('charlie_gazebo'),
+            'maps',
+            PythonExpression(["'", LaunchConfiguration('map_name'), ".yaml'"])
+        ]), 
+        description='Full path to map yaml file to load'
     )
 
     declare_params_file_cmd = DeclareLaunchArgument(
@@ -242,6 +257,7 @@ def generate_launch_description():
 
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
+    ld.add_action(declare_map_name_cmd)
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)
