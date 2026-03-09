@@ -1,0 +1,26 @@
+ara_star_node:
+  ros__parameters:
+    topics:
+      map: "/map"
+      goal: "/goal_pose"
+      path: "/planned_path"
+      debug_paths: "~/debug/all_epsilon_paths" # Tópico privado del nodo
+    
+    frames:
+      base: "base_link"
+      global: "map"
+      
+    geometry:
+      occupied_threshold: 65
+      use_8_connected: true
+      inflate_radius: 0.24
+      treat_unknown_as_obstacle: true
+      
+    ara_core:
+      epsilon_start: 2.5
+      epsilon_decrease: 0.5
+      time_limit_sec: 5.0
+      heuristic_type: "euclidean"
+      
+    debug:
+      publish_all_paths: true  # ¡Tu nuevo parámetro de verbosity!
