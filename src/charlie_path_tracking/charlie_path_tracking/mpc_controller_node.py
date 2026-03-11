@@ -36,13 +36,10 @@ class MpcControllerNode(Node):
 
     def __init__(self):
         super().__init__("mpc_controller_node")
-
-        # ==========================================================
-        # 1. DECLARACIÓN DE PARÁMETROS (ROS2)
-        # ==========================================================
         # Tópicos y Frames (Reciclado de Pure Pursuit)
         self.declare_parameter("path_topic", "/planned_path")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_nav")
+        self.declare_parameter("debug_topic","~/debug/mpc_prediction")
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("control_rate_hz", 20.0)
         self.declare_parameter("goal_tolerance", 0.25)
@@ -66,14 +63,19 @@ class MpcControllerNode(Node):
         self.declare_parameter("weight_accel", 0.5)   # Penaliza cambios bruscos en v
         self.declare_parameter("weight_alpha", 0.5) # Penaliza cambios bruscos en omega
 
+        # Habilitar debug 
+        self.declare_parameter("debug", True) # Si es true, se publicará la predicción del MPC en RViz para visualización.
+        
+
         # Lectura de parámetros... (Omitida por brevedad, asume que se leen aquí)
         self._load_parameters()
 
-        # ==========================================================
-        # 2. INFRAESTRUCTURA ROS2 (I/O)
-        # ==========================================================
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_topic, 10)
         self.path_sub = self.create_subscription(Path, self.path_topic, self.on_path, 10)
+
+        if self.debug_value:
+            self.pred_pub = self.create_publisher(Path, self.debug_topic, 10)
+            self.get_logger().info("Modo Debug Activado: Se publicara la predicción que hace el MPC en el topic.")
         
         self.tf_buffer = tf2_ros.Buffer(cache_time=Duration(seconds=5.0))
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -83,9 +85,6 @@ class MpcControllerNode(Node):
         self.path_frame: Optional[str] = None
         self.has_path = False
 
-        # ==========================================================
-        # 3. INICIALIZACIÓN DEL SOLVER MPC
-        # ==========================================================
         # Aquí pre-compilamos el problema de optimización en memoria
         self.solver, self.mpc_args = self._setup_mpc_problem()
 
@@ -97,18 +96,22 @@ class MpcControllerNode(Node):
         self.last_closest_index = 0
 
         self.timer = self.create_timer(dt_timer, self.on_timer)
+        self.get_logger().info(f"Velocidad máxima: {self.v_max}, Goal tolerance {self.goal_tol}")
         self.get_logger().info("Nodo MPC inicializado y esperando trayectoria.")
+
 
     def _load_parameters(self):
         """Lee todos los parámetros declarados y los asigna a variables de clase."""
         self.path_topic = self.get_parameter("path_topic").value
         self.cmd_topic = self.get_parameter("cmd_vel_topic").value
+        self.debug_topic = self.get_parameter("debug_topic").value
         self.base_frame = self.get_parameter("base_frame").value
         self.rate_hz = float(self.get_parameter("control_rate_hz").value)
         self.goal_tol = float(self.get_parameter("goal_tolerance").value)
         self.tf_timeout = float(self.get_parameter("tf_timeout_sec").value)
         self.N = self.get_parameter("mpc_N").value
         self.dt = self.get_parameter("mpc_dt").value
+        self.debug_value = self.get_parameter("debug").value
         # ... (leer el resto de pesos y límites) ...
 
     # ==========================================================
@@ -141,12 +144,12 @@ class MpcControllerNode(Node):
         # 2. Definir los límites (bounds) de los actuadores para todo el horizonte
         # self.N veces el par (limites_v, limites_w)
         v_min = self.get_parameter("v_min").value
-        v_max = self.get_parameter("v_max").value
+        self.v_max = self.get_parameter("v_max").value
         w_max = self.get_parameter("omega_max").value
         
         self.bounds = []
         for _ in range(self.get_parameter("mpc_N").value):
-            self.bounds.append((v_min, v_max))       # Límites para v_k
+            self.bounds.append((v_min, self.v_max))       # Límites para v_k
             self.bounds.append((-w_max, w_max))      # Límites para omega_k
             
         return None, {} # SciPy no compila un objeto solver externo
@@ -230,6 +233,9 @@ class MpcControllerNode(Node):
 
             # Actualizar el último comando enviado
             self.last_cmd = np.array([v_opt, omega_opt])
+            if self.debug_value:
+                self._publish_prediction(res.x, current_state)
+
             return float(v_opt), float(omega_opt)
         else:
             self.get_logger().warn(f"Optimizador falló: {res.message}. Deteniendo robot.")
@@ -361,6 +367,38 @@ class MpcControllerNode(Node):
         cmd.twist.linear.x = float(v)
         cmd.twist.angular.z = float(omega)
         self.cmd_pub.publish(cmd)
+
+    def _publish_prediction(self, U_opt: np.ndarray, current_state: np.ndarray) -> None:
+        """
+        Simula el modelo cinemático hacia adelante usando los comandos óptimos
+        y publica el resultado para visualización en RViz.
+        """
+        path_msg = Path()
+        path_msg.header.stamp = self.get_clock().now().to_msg()
+        # La predicción siempre nace y se dibuja desde el chasis del robot
+        path_msg.header.frame_id = self.base_frame 
+        
+        state = np.copy(current_state)
+        
+        for k in range(self.N):
+            v = U_opt[2*k]
+            omega = U_opt[2*k + 1]
+            
+            # Avanzar un paso en el futuro
+            state = self._kinematic_model(state, v, omega)
+            
+            # Crear el punto espacial
+            pose = PoseStamped()
+            pose.header = path_msg.header
+            pose.pose.position.x = float(state[0])
+            pose.pose.position.y = float(state[1])
+            
+            # Un cuaternión neutro básico para que RViz no arroje advertencias
+            pose.pose.orientation.w = 1.0 
+            
+            path_msg.poses.append(pose)
+            
+        self.pred_pub.publish(path_msg)
 
     def publish_stop(self) -> None:
         self._publish_cmd(0.0, 0.0)
