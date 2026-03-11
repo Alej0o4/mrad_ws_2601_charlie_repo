@@ -32,7 +32,7 @@ class PurePursuitNode(Node):
         super().__init__("pure_pursuit_node")
 
         # ---- Parameters
-        self.declare_parameter("path_topic", "/planned_path")
+        self.declare_parameter("path_topic", "/current_active_path") ##planned_path
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_nav")
 
         self.declare_parameter("base_frame", "base_link")
