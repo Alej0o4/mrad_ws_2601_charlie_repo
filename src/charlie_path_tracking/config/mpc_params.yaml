@@ -1,0 +1,50 @@
+mpc_controller_node:
+  ros__parameters:
+    # ---------------------------------------------------------
+    # Tópicos y Marcos de Referencia (Middleware)
+    # ---------------------------------------------------------
+    path_topic: "/planned_path"
+    cmd_vel_topic: "/cmd_vel_nav"
+    base_frame: "base_link"
+    debug_topic: "~/debug/mpc_prediction"
+
+    # ---------------------------------------------------------
+    # Control General y TF
+    # ---------------------------------------------------------
+    control_rate_hz: 20.0
+    goal_tolerance: 0.1
+    tf_timeout_sec: 0.2
+
+    # ---------------------------------------------------------
+    # Parámetros del Horizonte de Predicción (El Cerebro)
+    # ---------------------------------------------------------
+    mpc_N: 10              # Horizonte (cantidad de pasos a predecir)
+    mpc_dt: 0.25            # Tiempo de muestreo del modelo (segundos)
+
+    # ---------------------------------------------------------
+    # Restricciones Cinemáticas (Límites Físicos del Robot)
+    # ---------------------------------------------------------
+    v_max: 2.0             # m/s
+    v_min: -0.2            # m/s (Permite leve reversa si se pasa)
+    omega_max: 1.5         # rad/s
+
+    # ---------------------------------------------------------
+    # Matrices de Pesos (Sintonización de la Función de Costo)
+    # ---------------------------------------------------------
+    # Q: Penalización de error de estado (Cross-track y Heading)
+    weight_x: 1.0
+    weight_y: 1.0
+    weight_theta: 0.5      # Menos estricto con el ángulo para permitir curvas suaves
+    
+    # R: Penalización por uso de actuadores (Esfuerzo de control)
+    weight_v: 0.1
+    weight_omega: 0.1
+    
+    # R_d: Penalización por cambios bruscos (Suavizador de inercia/Jerk)
+    weight_accel: 0.5      # Castiga aceleraciones/frenadas bruscas lineales
+    weight_alpha: 0.5      # Castiga aceleraciones/frenadas bruscas angulares
+
+    # ---------------------------------------------------------
+    # Parámetro de debug
+    # ---------------------------------------------------------
+    debug: false

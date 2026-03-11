@@ -13,7 +13,7 @@ ara_star_node:
     geometry:
       occupied_threshold: 65
       use_8_connected: true
-      inflate_radius: 0.24
+      inflate_radius: 0.48  # Inflar un poco más que el radio del robot para seguridad
       treat_unknown_as_obstacle: true
       
     ara_core:
