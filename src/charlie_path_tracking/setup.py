@@ -30,6 +30,7 @@ setup(
         'console_scripts': [
             'pure_pursuit_v1 = charlie_path_tracking.pure_pursuit_v1:main',
             'mpc_controller_node = charlie_path_tracking.mpc_controller_node:main',
+            'stanley_node = charlie_path_tracking.stanley_node:main',
         ],
     },
 )

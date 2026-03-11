@@ -16,9 +16,9 @@ mpc_controller_node:
     tf_timeout_sec: 0.2
 
     # ---------------------------------------------------------
-    # Parámetros del Horizonte de Predicción (El Cerebro)
+    # Parámetros del Horizonte de Predicción
     # ---------------------------------------------------------
-    mpc_N: 15             # Horizonte (cantidad de pasos a predecir)
+    mpc_N: 10             # Horizonte (cantidad de pasos a predecir)
     mpc_dt: 0.1            # Tiempo de muestreo del modelo (segundos) aumentarlo lo hace lento pero sigue mejor, disminuirlo lo hace más reactivo pero puede ser inestable
 
     # ---------------------------------------------------------
