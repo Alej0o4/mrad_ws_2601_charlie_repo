@@ -374,7 +374,11 @@ class MpcControllerNode(Node):
         y publica el resultado para visualización en RViz.
         """
         path_msg = Path()
-        path_msg.header.stamp = self.get_clock().now().to_msg()
+        
+        # FIX TF2: Al instanciar un Time de rclpy vacío, se genera una estampa de tiempo 0.
+        # Esto evita que RViz encole el mensaje esperando una transformada futura.
+        path_msg.header.stamp = rclpy.time.Time().to_msg()
+        
         # La predicción siempre nace y se dibuja desde el chasis del robot
         path_msg.header.frame_id = self.base_frame 
         
@@ -389,7 +393,7 @@ class MpcControllerNode(Node):
             
             # Crear el punto espacial
             pose = PoseStamped()
-            pose.header = path_msg.header
+            pose.header = path_msg.header # Hereda el tiempo 0 y el frame_id
             pose.pose.position.x = float(state[0])
             pose.pose.position.y = float(state[1])
             

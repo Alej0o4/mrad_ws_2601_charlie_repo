@@ -18,13 +18,13 @@ mpc_controller_node:
     # ---------------------------------------------------------
     # Parámetros del Horizonte de Predicción (El Cerebro)
     # ---------------------------------------------------------
-    mpc_N: 10              # Horizonte (cantidad de pasos a predecir)
-    mpc_dt: 0.25            # Tiempo de muestreo del modelo (segundos)
+    mpc_N: 10             # Horizonte (cantidad de pasos a predecir)
+    mpc_dt: 0.1            # Tiempo de muestreo del modelo (segundos)
 
     # ---------------------------------------------------------
     # Restricciones Cinemáticas (Límites Físicos del Robot)
     # ---------------------------------------------------------
-    v_max: 2.0             # m/s
+    v_max: 1.0             # m/s
     v_min: -0.2            # m/s (Permite leve reversa si se pasa)
     omega_max: 1.5         # rad/s
 
@@ -47,4 +47,4 @@ mpc_controller_node:
     # ---------------------------------------------------------
     # Parámetro de debug
     # ---------------------------------------------------------
-    debug: false
+    debug: true
