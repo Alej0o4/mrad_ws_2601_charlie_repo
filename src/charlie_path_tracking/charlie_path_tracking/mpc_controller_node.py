@@ -168,40 +168,34 @@ class MpcControllerNode(Node):
         return np.array([x_next, y_next, theta_next])
     
     def _cost_function(self, U: np.ndarray, current_state: np.ndarray, ref_traj: np.ndarray, current_cmd: np.ndarray) -> float:
-        """
-        Función objetivo J que SciPy intentará minimizar.
-        Simula el robot hacia el futuro usando los comandos U y penaliza el error.
-        """
         cost = 0.0
         state = np.copy(current_state)
-
         prev_u = np.copy(current_cmd)        
-        # U viene como un arreglo 1D plano: [v0, w0, v1, w1, ...]
+        
+        # Penalización Terminal (Terminal Cost)
+        P_multiplier = 10.0 
+
         for k in range(self.N):
             v = U[2*k]
             omega = U[2*k + 1]
             u_vec = np.array([v, omega])
             
-            
-            # 1. Simular un paso hacia adelante (La física)
             state = self._kinematic_model(state, v, omega)
-            
-            # 2. Calcular el error respecto a la trayectoria de referencia
             error = state - ref_traj[k]
-            
-            # Normalizar el error de orientación (theta) para que esté entre -pi y pi.
-            # Esto evita que el robot dé vueltas locas si el error salta a 2*pi.
             error[2] = np.arctan2(np.sin(error[2]), np.cos(error[2]))
             
-            # 3. Sumar el costo de este paso: e^T * Q * e  +  u^T * R * u
-            delta_u = u_vec - prev_u # Calcular el cambio brusco de velocidad (Delta U)
+            delta_u = u_vec - prev_u 
             
-            state_cost = error.T @ self.Q @ error
+            # Si es el último paso del horizonte, multiplicamos el castigo
+            if k == self.N - 1:
+                state_cost = error.T @ (self.Q * P_multiplier) @ error
+            else:
+                state_cost = error.T @ self.Q @ error
+                
             control_cost = u_vec.T @ self.R @ u_vec
             delta_control_cost = delta_u.T @ self.R_d @ delta_u
             
             cost += (state_cost + control_cost + delta_control_cost)
-
             prev_u = u_vec
             
         return cost
@@ -222,7 +216,7 @@ class MpcControllerNode(Node):
             args=(current_state, ref_traj, self.last_cmd), 
             method='SLSQP', 
             bounds=self.bounds,
-            options={'ftol': 1e-3, 'maxiter': 50}
+            options={'ftol': 1e-2, 'maxiter': 30, 'eps': 1e-2}
         )
         
         if res.success:
@@ -292,7 +286,9 @@ class MpcControllerNode(Node):
         # Si tu path tiene puntos cada 5cm, y esperas que el robot avance 10cm por cada dt (0.1s),
         # deberías saltar de a 2 índices. Lo dejaremos parametrizado.
         
-        index_step = 1 # Esto debería ser idealmente un parámetro o calculado dinámicamente
+        dist_per_step = self.v_max * self.dt
+        puntos_por_metro = 20.0 # Ajusta esto según cómo tu planificador local genere la ruta
+        index_step = max(1, int(dist_per_step * puntos_por_metro))
         
         for k in range(self.N):
             # Calculamos el índice objetivo saltando hacia adelante
