@@ -4,6 +4,7 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.srv import GetPlan
 from nav_msgs.msg import Path
 import threading
+from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
 class WaypointManager(Node):
     def __init__(self):
@@ -17,20 +18,28 @@ class WaypointManager(Node):
         self.full_path = Path()
         self.full_path.header.frame_id = 'map'
         
-        self.state = "RECOLECTANDO" # Estados: RECOLECTANDO, CALCULANDO, FINALIZADO
+        self.state = "RECOLECTANDO" 
         self.current_req_index = 0
 
-        # Subscripciones y Publicadores
-        self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.rviz_goal_callback, 10)
+        # Publicador de la ruta final
         self.path_pub = self.create_publisher(Path, '/current_active_path', 10)
 
-        # Hilo de teclado
-        self.input_thread = threading.Thread(target=self.wait_for_user)
-        self.input_thread.daemon = True
-        self.input_thread.start()
+        # Declarar y leer parámetros ANTES de configurar los modos
+        self.declare_parameter('use_rviz_clicks', True)
+        self.declare_parameter(
+            'static_waypoints',
+            [0.0],
+            ParameterDescriptor(type=ParameterType.PARAMETER_DOUBLE_ARRAY),
+            
+        )
+
+        self._use_clicks = self.get_parameter('use_rviz_clicks').get_parameter_value().bool_value
+        raw_waypoints = self.get_parameter('static_waypoints').get_parameter_value().double_array_value
+
+        # Delegamos toda la lógica condicional a esta función
+        self.setup_waypoint_mode(raw_waypoints)
 
         self.get_logger().info('✅ GESTOR DE WAYPOINTS LISTO.')
-        self.get_logger().info('📍 Marca puntos en RViz y presiona ENTER en la terminal para unirlos.')
 
     def wait_for_user(self):
         while rclpy.ok():
@@ -118,6 +127,44 @@ class WaypointManager(Node):
                 
         except Exception as e:
             self.get_logger().error(f'Error en el servicio: {e}')
+
+    def auto_start_callback(self):
+        # Destruimos este timer porque solo queremos que corra UNA vez
+        if hasattr(self, 'auto_timer'):
+            self.auto_timer.destroy()
+            
+        self.get_logger().info("¡Arrancando secuencia predefinida!")
+        self.iniciar_secuencia()
+
+    def setup_waypoint_mode(self, raw_waypoints):
+        """
+        Configura el modo de operación del nodo (Automático por YAML o Interactivo por RViz)
+        e inicializa los recursos estrictamente necesarios.
+        """
+        if not self._use_clicks:
+            self.get_logger().info("Modo Automático: Cargando puntos desde YAML...")
+            
+            for i in range(0, len(raw_waypoints), 2):
+                if i + 1 < len(raw_waypoints):
+                    self.waypoints.append((raw_waypoints[i], raw_waypoints[i+1]))
+            
+            self.get_logger().info(f"Se cargaron {len(self.waypoints)} puntos fijos.")
+            
+            self.state = "CALCULANDO"
+            # No creamos hilos de teclado ni nos suscribimos a RViz. Ahorro de recursos total.
+            self.auto_timer = self.create_timer(2.0, self.auto_start_callback)
+            
+        else:
+            self.get_logger().info("Modo Interactivo: Esperando clics en RViz...")
+            self.get_logger().info('📍 Marca puntos en RViz y presiona ENTER en la terminal para unirlos.')
+            
+            # 1. Solo nos suscribimos a los clics si realmente los vamos a usar
+            self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.rviz_goal_callback, 10)
+            
+            # 2. Solo levantamos el hilo del teclado si esperamos interacción humana
+            self.input_thread = threading.Thread(target=self.wait_for_user)
+            self.input_thread.daemon = True
+            self.input_thread.start()
 
 def main(args=None):
     rclpy.init(args=args)
