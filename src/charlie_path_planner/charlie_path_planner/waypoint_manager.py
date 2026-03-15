@@ -5,6 +5,7 @@ from nav_msgs.srv import GetPlan
 from nav_msgs.msg import Path
 import threading
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
+from visualization_msgs.msg import Marker, MarkerArray
 
 class WaypointManager(Node):
     def __init__(self):
@@ -23,6 +24,7 @@ class WaypointManager(Node):
 
         # Publicador de la ruta final
         self.path_pub = self.create_publisher(Path, '/current_active_path', 10)
+        self.marker_pub = self.create_publisher(MarkerArray, '/waypoint_markers', 10)
 
         # Declarar y leer parámetros ANTES de configurar los modos
         self.declare_parameter('use_rviz_clicks', True)
@@ -43,16 +45,25 @@ class WaypointManager(Node):
 
     def wait_for_user(self):
         while rclpy.ok():
-            input("\n >>> Presiona ENTER para iniciar la secuenciación de rutas <<< \n")
+            entrada = input("\n >>> ENTER para iniciar rutas | Escribe 'z' + ENTER para borrar el último punto <<< \n")
             if self.state == "RECOLECTANDO":
-                self.iniciar_secuencia()
+                if entrada.strip().lower() == 'z':
+                    if len(self.waypoints) > 0:
+                        borrado = self.waypoints.pop()
+                        self.get_logger().info(f'Punto eliminado: ({borrado[0]:.2f}, {borrado[1]:.2f})')
+                        self.publish_markers() # Actualizamos RViz
+                    else:
+                        self.get_logger().warn("No hay puntos para borrar.")
+                else:
+                    self.iniciar_secuencia()
             else:
-                self.get_logger().warn("El nodo ya está calculando o finalizó. Reinicia el nodo para otra ruta.")
+                self.get_logger().warn("El nodo ya está calculando o finalizó. Reinicia para otra ruta.")
 
     def rviz_goal_callback(self, msg):
         if self.state == "RECOLECTANDO":
             self.waypoints.append((msg.pose.position.x, msg.pose.position.y))
             self.get_logger().info(f'Punto {len(self.waypoints)} guardado: ({msg.pose.position.x:.2f}, {msg.pose.position.y:.2f})')
+            self.publish_markers()
 
     def iniciar_secuencia(self):
         if len(self.waypoints) < 1:
@@ -149,7 +160,8 @@ class WaypointManager(Node):
                     self.waypoints.append((raw_waypoints[i], raw_waypoints[i+1]))
             
             self.get_logger().info(f"Se cargaron {len(self.waypoints)} puntos fijos.")
-            
+            self.publish_markers()
+
             self.state = "CALCULANDO"
             # No creamos hilos de teclado ni nos suscribimos a RViz. Ahorro de recursos total.
             self.auto_timer = self.create_timer(2.0, self.auto_start_callback)
@@ -165,6 +177,56 @@ class WaypointManager(Node):
             self.input_thread = threading.Thread(target=self.wait_for_user)
             self.input_thread.daemon = True
             self.input_thread.start()
+
+    def publish_markers(self):
+        marker_array = MarkerArray()
+
+        # Marcador especial para borrar los anteriores antes de redibujar
+        delete_marker = Marker()
+        delete_marker.action = Marker.DELETEALL
+        marker_array.markers.append(delete_marker)
+
+        for i, wp in enumerate(self.waypoints):
+            # 1. Esfera en la posición del waypoint
+            m = Marker()
+            m.header.frame_id = 'map'
+            m.header.stamp = self.get_clock().now().to_msg()
+            m.ns = 'waypoints_spheres'
+            m.id = i * 2
+            m.type = Marker.SPHERE
+            m.action = Marker.ADD
+            m.pose.position.x = wp[0]
+            m.pose.position.y = wp[1]
+            m.pose.position.z = 0.0
+            m.scale.x = 0.4  # Tamaño de la esfera
+            m.scale.y = 0.4
+            m.scale.z = 0.4
+            m.color.r = 0.0  # Color Cyan
+            m.color.g = 1.0
+            m.color.b = 1.0
+            m.color.a = 0.8  # Transparencia
+            marker_array.markers.append(m)
+
+            # 2. Texto flotante con el número
+            t = Marker()
+            t.header.frame_id = 'map'
+            t.header.stamp = self.get_clock().now().to_msg()
+            t.ns = 'waypoints_text'
+            t.id = (i * 2) + 1
+            t.type = Marker.TEXT_VIEW_FACING
+            t.action = Marker.ADD
+            t.pose.position.x = wp[0]
+            t.pose.position.y = wp[1]
+            t.pose.position.z = 0.5  # Medio metro arriba de la esfera
+            t.scale.z = 0.5        # Tamaño de la letra
+            t.color.r = 1.0        # Texto blanco
+            t.color.g = 1.0
+            t.color.b = 1.0
+            t.color.a = 1.0
+            t.text = str(i + 1)
+            marker_array.markers.append(t)
+
+        self.marker_pub.publish(marker_array)
 
 def main(args=None):
     rclpy.init(args=args)
