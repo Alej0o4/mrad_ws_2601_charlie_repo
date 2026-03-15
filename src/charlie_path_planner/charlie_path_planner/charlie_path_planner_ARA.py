@@ -241,11 +241,11 @@ class ARAPlannerNode(Node):
             self.get_logger().warn("El Request no trajo Start Pose. Usando TF del robot...")
             try:
                 transform = self.tf_buffer.lookup_transform(
-                    self.get_parameter('global_frame').value,
-                    self.get_parameter('base_frame').value,
+                    self.get_parameter('frames.global_frame').value,
+                    self.get_parameter('frames.base_frame').value,
                     rclpy.time.Time()
                 )
-                start_pose.header.frame_id = self.get_parameter('global_frame').value
+                start_pose.header.frame_id = self.get_parameter('frames.global_frame').value
                 start_pose.pose.position.x = transform.transform.translation.x
                 start_pose.pose.position.y = transform.transform.translation.y
             except Exception as e:

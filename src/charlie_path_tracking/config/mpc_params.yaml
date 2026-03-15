@@ -3,7 +3,7 @@ mpc_controller_node:
     # ---------------------------------------------------------
     # Tópicos y Marcos de Referencia (Middleware)
     # ---------------------------------------------------------
-    path_topic: "/planned_path"
+    path_topic: "/current_active_path"
     cmd_vel_topic: "/cmd_vel_nav"
     base_frame: "base_link"
     debug_topic: "~/debug/mpc_prediction"
@@ -18,13 +18,13 @@ mpc_controller_node:
     # ---------------------------------------------------------
     # Parámetros del Horizonte de Predicción
     # ---------------------------------------------------------
-    mpc_N: 10           # Horizonte (cantidad de pasos a predecir)
+    mpc_N: 7           # Horizonte (cantidad de pasos a predecir)
     mpc_dt: 0.1            # Tiempo de muestreo del modelo (segundos) aumentarlo lo hace lento pero sigue mejor, disminuirlo lo hace más reactivo pero puede ser inestable
 
     # ---------------------------------------------------------
     # Restricciones Cinemáticas (Límites Físicos del Robot)
     # ---------------------------------------------------------
-    v_max: 2.0             # m/s
+    v_max: 3.0             # m/s
     v_min: -0.2            # m/s (Permite leve reversa si se pasa)
     omega_max: 1.5         # rad/s
 
