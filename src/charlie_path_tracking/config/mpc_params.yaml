@@ -11,7 +11,7 @@ mpc_controller_node:
     # ---------------------------------------------------------
     # Control General y TF
     # ---------------------------------------------------------
-    control_rate_hz: 20.0
+    control_rate_hz: 15.0
     goal_tolerance: 0.1
     tf_timeout_sec: 0.2
 

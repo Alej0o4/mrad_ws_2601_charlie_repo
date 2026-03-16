@@ -4,10 +4,11 @@ waypoint_manager:
     use_rviz_clicks: false  # Si es false, usará la lista de abajo
     
     # Tu pista de carreras predefinida [x1, y1, x2, y2, ...]
-    static_waypoints: [
+  static_waypoints: [
       -18.0, 6.75,
       -14.5, 7.5,
-      -10.22, 7.00,
+      -9.86682, 8.20175,
+      -6.88,5.1,
       -3.53178, 0.843339,
       1.54259, 2.66694,
       4.30, 8.0,
@@ -18,7 +19,8 @@ waypoint_manager:
       19.374, -6.1017,
       12.8045, -6.84838,
       7.3728, -9.60,
-      3.52871, -9.60,
+      5.02,-9.95,
+      2.88957, -9.10,
       0.75, -5.50,
       -8.82, -5.40,
       -13.32, -2.71,
