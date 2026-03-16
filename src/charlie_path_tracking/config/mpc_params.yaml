@@ -24,7 +24,7 @@ mpc_controller_node:
     # ---------------------------------------------------------
     # Restricciones Cinemáticas (Límites Físicos del Robot)
     # ---------------------------------------------------------
-    v_max: 4.75             # m/s
+    v_max: 5.4             # m/s
     v_min: -0.2            # m/s (Permite leve reversa si se pasa)
     omega_max: 1.5         # rad/s
 
