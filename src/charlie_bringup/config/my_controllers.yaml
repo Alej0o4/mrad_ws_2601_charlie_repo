@@ -29,7 +29,7 @@ diffdrive_controller:
         has_velocity_limits: false
         max_velocity: 5.0        # m/s
         has_acceleration_limits: true
-        max_acceleration: 1.5    # m/s^2 
+        max_acceleration: 3.0    # m/s^2 
         
     # Evita giros bruscos que marean la odometría
     angular:

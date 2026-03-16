@@ -37,14 +37,15 @@ mpc_controller_node:
     weight_theta: 0.5      # Menos estricto con el ángulo para permitir curvas suaves
     
     # R: Penalización por uso de actuadores (Esfuerzo de control)
-    weight_v: 0.1
+    weight_v: 0.01
     weight_omega: 0.1
     
     # R_d: Penalización por cambios bruscos (Suavizador de inercia/Jerk)
-    weight_accel: 0.5      # Castiga aceleraciones/frenadas bruscas lineales
-    weight_alpha: 0.5      # Castiga aceleraciones/frenadas bruscas angulares
+    weight_accel: 2.0      # Castiga aceleraciones/frenadas bruscas lineales
+    weight_alpha: 2.0      # Castiga aceleraciones/frenadas bruscas angulares
 
     # ---------------------------------------------------------
     # Parámetro de debug
     # ---------------------------------------------------------
     debug: true
+    use_joy_deadman_switch: true # Si es true, el robot solo se moverá si se recibe un comando de joystick específico

@@ -18,6 +18,7 @@ from scipy.optimize import minimize
 import numpy as np
 from typing import Tuple, Dict
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy
+from sensor_msgs.msg import Joy
 
 def euler_from_quaternion(q) -> float:
     """
@@ -63,6 +64,8 @@ class MpcControllerNode(Node):
         self.declare_parameter("weight_omega", 0.1)
         self.declare_parameter("weight_accel", 0.5)   # Penaliza cambios bruscos en v
         self.declare_parameter("weight_alpha", 0.5) # Penaliza cambios bruscos en omega
+        self.declare_parameter("use_joy_deadman_switch", False) # Si es true, el robot solo se moverá si se recibe un comando de joystick específico
+
 
         # Habilitar debug 
         self.declare_parameter("debug", True) # Si es true, se publicará la predicción del MPC en RViz para visualización.
@@ -83,6 +86,12 @@ class MpcControllerNode(Node):
         if self.debug_value:
             self.pred_pub = self.create_publisher(Path, self.debug_topic, 10)
             self.get_logger().info("Modo Debug Activado: Se publicara la predicción que hace el MPC en el topic.")
+        if self.use_joy_deadman:
+            # Nos suscribimos al tópico estándar de joystick
+            self.joy_sub = self.create_subscription(Joy, '/joy', self.joy_callback, 10)
+            self.get_logger().info("Deadman Switch ACTIVADO. Mantén presionado el botón 'A' (Índice 0) para permitir el movimiento.")
+        else:
+            self.get_logger().warn("Deadman Switch DESACTIVADO. El robot se moverá de forma completamente autónoma.")
         
         self.tf_buffer = tf2_ros.Buffer(cache_time=Duration(seconds=5.0))
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -119,6 +128,8 @@ class MpcControllerNode(Node):
         self.N = self.get_parameter("mpc_N").value
         self.dt = self.get_parameter("mpc_dt").value
         self.debug_value = self.get_parameter("debug").value
+        self.use_joy_deadman = self.get_parameter("use_joy_deadman_switch").value
+        self.deadman_button_active = False # Estado del botón de deadman (si se habilita)
         # ... (leer el resto de pesos y límites) ...
 
     # ==========================================================
@@ -365,11 +376,24 @@ class MpcControllerNode(Node):
         self._publish_cmd(v_cmd, omega_cmd)
 
     def _publish_cmd(self, v: float, omega: float) -> None:
+        if self.use_joy_deadman and not self.deadman_button_active:
+            # Si la seguridad está activada y no presionas la 'A', forzamos paro absoluto.
+            v = 0.0
+            omega = 0.0
         cmd = TwistStamped()
         cmd.header.stamp = self.get_clock().now().to_msg()
         cmd.twist.linear.x = float(v)
         cmd.twist.angular.z = float(omega)
         self.cmd_pub.publish(cmd)
+
+    def joy_callback(self, msg: Joy) -> None:
+        """
+        Lee el estado del joystick. 
+        El botón 'A' en un control de Xbox/Logitech suele ser el índice 0 del arreglo buttons.
+        """
+        if len(msg.buttons) > 0:
+            # msg.buttons[0] valdrá 1 si está presionado, 0 si está suelto.
+            self.deadman_button_active = bool(msg.buttons[0])
 
     def _publish_prediction(self, U_opt: np.ndarray, current_state: np.ndarray) -> None:
         """
