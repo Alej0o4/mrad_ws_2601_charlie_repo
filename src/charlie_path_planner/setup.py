@@ -32,6 +32,7 @@ setup(
             'dijkstra_node_v3 = charlie_path_planner.charlie_path_planner_dijkstra_v3:main',
             'ara_star_node = charlie_path_planner.charlie_path_planner_ARA:main',
             'waypoint_manager = charlie_path_planner.waypoint_manager:main',
+            'path_smoother_node = charlie_path_planner.path_smoother_node:main',
         ],
     },
 )

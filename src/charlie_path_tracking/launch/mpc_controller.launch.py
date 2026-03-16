@@ -20,7 +20,9 @@ def generate_launch_description():
         executable='mpc_controller_node', # El nombre del ejecutable definido en tu setup.py
         name='mpc_controller_node',       # Debe coincidir con la raíz del YAML
         output='screen',                  # Imprime los get_logger() en la terminal
-        parameters=[config_file_path]     # Inyecta el archivo de parámetros
+        parameters=[
+            config_file_path,
+            {'use_sim_time': True}]     # Inyecta el archivo de parámetros
     )
 
     # 4. Retorna la descripción del lanzamiento
