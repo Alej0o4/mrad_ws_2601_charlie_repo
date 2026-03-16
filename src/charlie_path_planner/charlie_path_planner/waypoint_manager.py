@@ -21,6 +21,7 @@ class WaypointManager(Node):
         
         self.state = "RECOLECTANDO" 
         self.current_req_index = 0
+        self.declare_parameter('num_laps', 1)
 
         # Publicador de la ruta final
         self.path_pub = self.create_publisher(Path, '/current_active_path', 10)
@@ -36,6 +37,7 @@ class WaypointManager(Node):
         )
 
         self._use_clicks = self.get_parameter('use_rviz_clicks').get_parameter_value().bool_value
+        self._num_laps = self.get_parameter('num_laps').get_parameter_value().integer_value
         raw_waypoints = self.get_parameter('static_waypoints').get_parameter_value().double_array_value
 
         # Delegamos toda la lógica condicional a esta función
@@ -69,6 +71,13 @@ class WaypointManager(Node):
         if len(self.waypoints) < 1:
             self.get_logger().warn("¡No hay puntos! Marca al menos 1 destino en RViz.")
             return
+        
+        if self._num_laps > 1:
+            self.get_logger().info(f'🔄 Generando trayectoria para {self._num_laps} vueltas...')
+            # Guardamos los puntos originales y los repetimos
+            puntos_originales = list(self.waypoints)
+            for _ in range(self._num_laps - 1):
+                self.waypoints.extend(puntos_originales)
 
         self.get_logger().info('🚀 Cerrando recolección e iniciando cálculos en cadena...')
         self.state = "CALCULANDO"
