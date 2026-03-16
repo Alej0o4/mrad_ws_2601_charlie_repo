@@ -17,6 +17,7 @@ from tf2_geometry_msgs import do_transform_pose_stamped
 from scipy.optimize import minimize
 import numpy as np
 from typing import Tuple, Dict
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy
 
 def euler_from_quaternion(q) -> float:
     """
@@ -70,8 +71,14 @@ class MpcControllerNode(Node):
         # Lectura de parámetros... (Omitida por brevedad, asume que se leen aquí)
         self._load_parameters()
 
+        latched_qos = QoSProfile(
+            depth=1,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            history=QoSHistoryPolicy.KEEP_LAST
+        )
+
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_topic, 10)
-        self.path_sub = self.create_subscription(Path, self.path_topic, self.on_path, 10)
+        self.path_sub = self.create_subscription(Path, self.path_topic, self.on_path, latched_qos)
 
         if self.debug_value:
             self.pred_pub = self.create_publisher(Path, self.debug_topic, 10)
