@@ -11,7 +11,7 @@ def generate_launch_description():
     config_file = os.path.join(
         get_package_share_directory(pkg_name),
         'config',
-        'waypoints.yaml'
+        'waypoints_obstacles.yaml'
     )
 
     # 3. Configurar el nodo
