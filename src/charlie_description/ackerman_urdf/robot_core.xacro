@@ -1,0 +1,225 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- Include macros -->
+    <xacro:include filename="$(find charlie_description)/macros/inertial_macros.xacro"/>
+
+    <!-- Properties -->
+    <xacro:property name="scale" value="2"/>
+
+    <!-- Camera dimensions -->
+    <xacro:property name="cam_base_x" value="${scale*0.015}"/>
+    <xacro:property name="cam_base_y" value="${scale*0.015}"/>
+    <xacro:property name="cam_base_z" value="${scale*0.015}"/>
+
+    <xacro:property name="cam_x" value="${scale*0.025}"/>
+    <xacro:property name="cam_y" value="${scale*0.05}"/>
+    <xacro:property name="cam_z" value="${scale*0.025}"/>
+
+    <!-- Robot dimensions -->
+    <xacro:property name="rad_w" value="${scale*0.05}"/>
+    <xacro:property name="le_w" value="${scale*0.04}"/>
+    <xacro:property name="ly" value="${scale*0.3}"/>
+    <xacro:property name="lx" value="${scale*0.4}"/>
+    <xacro:property name="lz" value="${scale*0.05}"/>
+    <xacro:property name="offset" value="${scale*0.1}"/>
+
+    <!-- Steering components -->
+    <xacro:property name="steering_r" value="${scale*0.01}"/>
+    <xacro:property name="steering_l" value="${scale*0.15}"/>
+
+    <!-- IMU dimensions -->
+    <xacro:property name="imu_lx" value="${scale*0.05}"/>
+    <xacro:property name="imu_ly" value="${scale*0.05}"/>
+    <xacro:property name="imu_lz" value="${scale*0.01}"/>
+
+    <!-- Macros -->
+    <xacro:macro name="wheel_macro" params="p_name p_radius p_length p_color p_mass">
+        <link name="${p_name}">
+            <visual>
+                <geometry>
+                    <cylinder radius="${p_radius}" length="${p_length}"/>
+                </geometry>
+                <material name="${p_color}"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder radius="${p_radius}" length="${p_length}"/>
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+            </collision>
+            <xacro:inertial_cylinder mass="${p_mass}" length="${p_length}" radius="${p_radius}">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+            </xacro:inertial_cylinder>
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="steering_macro" params="p_name p_radius p_length p_color p_mass">
+        <link name="${p_name}">
+            <visual>
+                <origin xyz="0.0 0 0"/>
+                <geometry>
+                    <cylinder radius="${p_radius}" length="${p_length}"/>
+                </geometry>
+                <material name="${p_color}"/>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0"/>
+                <geometry>
+                    <cylinder radius="${p_radius}" length="${p_length}"/>
+                </geometry>
+            </collision>
+            <xacro:inertial_cylinder mass="${p_mass}" length="${p_length}" radius="${p_radius}">
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+            </xacro:inertial_cylinder>
+        </link>
+    </xacro:macro>
+
+    <!-- Base Links -->
+    <link name="base_link">
+    </link>
+
+    <!-- Chassis -->
+    <link name="chassis">
+        <visual>
+            <origin xyz="0 0 0"/>
+            <geometry>
+                <box size="${lx} ${ly} ${lz}"/>
+            </geometry>
+            <material name="white"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0"/>
+            <geometry>
+               <box size="${lx} ${ly} ${lz}"/>
+            </geometry>
+        </collision>
+        <xacro:inertial_box mass="5.0" x="${lx}" y="${ly}" z="${lz}">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
+    </link>
+
+    <!-- Steering Links -->
+    <xacro:steering_macro p_name="left_steering_link" 
+                         p_radius="${steering_r}"
+                         p_length="${steering_l}" 
+                         p_color="gray"
+                         p_mass="0.1"/>
+
+    <xacro:steering_macro p_name="right_steering_link" 
+                         p_radius="${steering_r}"
+                         p_length="${steering_l}" 
+                         p_color="gray"
+                         p_mass="0.1"/>
+
+    <xacro:steering_macro p_name="left_rear_steering_link" 
+                         p_radius="${steering_r}"
+                         p_length="${steering_l}" 
+                         p_color="gray"
+                         p_mass="0.1"/>
+
+    <xacro:steering_macro p_name="right_rear_steering_link" 
+                         p_radius="${steering_r}"
+                         p_length="${steering_l}" 
+                         p_color="gray"
+                         p_mass="0.1"/>
+
+    <!-- Wheel Links -->
+    <xacro:wheel_macro p_name="left_front_wheel" 
+                      p_radius="${rad_w}"
+                      p_length="${le_w}" 
+                      p_color="orange"
+                      p_mass="1.0"/>
+
+    <xacro:wheel_macro p_name="right_front_wheel" 
+                      p_radius="${rad_w}"
+                      p_length="${le_w}" 
+                      p_color="orange"
+                      p_mass="1.0"/>
+
+    <xacro:wheel_macro p_name="left_rear_wheel" 
+                      p_radius="${rad_w}"
+                      p_length="${le_w}" 
+                      p_color="black"
+                      p_mass="1.0"/>
+
+    <xacro:wheel_macro p_name="right_rear_wheel" 
+                      p_radius="${rad_w}"
+                      p_length="${le_w}" 
+                      p_color="black"
+                      p_mass="1.0"/>
+
+    <!-- Joints -->
+    <joint name="base_link_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="chassis"/>
+        <origin xyz="0 0 0"/>
+    </joint>
+
+    <!-- Front Steering Joints -->
+    <joint name="left_steering_wheel_joint" type="revolute">
+        <parent link="chassis"/>
+        <child link="left_steering_link"/>
+        <origin xyz="${lx/2 - offset} ${ly/2+steering_r} -${lz}" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="-${pi/4}" upper="${pi/4}" effort="5.0" velocity="1.0"/>
+        <dynamics damping="0.5" friction="0.0"/>
+    </joint>
+
+    <joint name="right_steering_wheel_joint" type="revolute">
+        <parent link="chassis"/>
+        <child link="right_steering_link"/>
+        <origin xyz="${lx/2 - offset} -${ly/2 + steering_r} -${lz}" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <limit lower="-${pi/4}" upper="${pi/4}" effort="5.0" velocity="1.0"/>
+        <dynamics damping="0.5" friction="0.0"/>
+    </joint>
+
+    <!-- Rear Steering Joints (Fixed) -->
+    <joint name="left_rear_steering_joint" type="fixed">
+        <parent link="chassis"/>
+        <child link="left_rear_steering_link"/>
+        <origin xyz="-${lx/2-offset} ${ly/2+steering_r} -${lz}" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="right_rear_steering_joint" type="fixed">
+        <parent link="chassis"/>
+        <child link="right_rear_steering_link"/>
+        <origin xyz="-${lx/2-offset} -${ly/2+steering_r} -${lz}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Wheel Joints -->
+    <joint name="left_front_wheel_joint" type="continuous">
+        <parent link="left_steering_link"/>
+        <child link="left_front_wheel"/>
+        <origin xyz="0.0 ${le_w/2+steering_r} -${steering_l/2-rad_w}" rpy="${pi/2} 0 0"/>
+        <axis xyz="0 0 -1"/>
+        <dynamics damping="0.2" friction="0.0"/>
+    </joint>
+
+    <joint name="right_front_wheel_joint" type="continuous">
+        <parent link="right_steering_link"/>
+        <child link="right_front_wheel"/>
+        <origin xyz="0.0 -${le_w/2+steering_r} -${steering_l/2-rad_w}" rpy="${pi/2} 0 0"/>
+        <axis xyz="0 0 -1"/>
+        <dynamics damping="0.2" friction="0.0"/>
+    </joint>
+
+    <joint name="left_rear_wheel_joint" type="continuous">
+        <parent link="left_rear_steering_link"/>
+        <child link="left_rear_wheel"/>
+        <origin xyz="0.0 ${le_w/2+steering_r} -${steering_l/2-rad_w}" rpy="${pi/2} 0 0"/>
+        <axis xyz="0 0 1"/>
+        <dynamics damping="0.2" friction="0.0"/>
+    </joint>
+
+    <joint name="right_rear_wheel_joint" type="continuous">
+        <parent link="right_rear_steering_link"/>
+        <child link="right_rear_wheel"/>
+        <origin xyz="0.0 -${le_w/2+steering_r} -${steering_l/2-rad_w}" rpy="${pi/2} 0 0"/>
+        <axis xyz="0 0 -1"/>
+        <dynamics damping="0.2" friction="0.0"/>
+    </joint>
+
+</robot>

@@ -15,6 +15,7 @@ setup(
         (os.path.join('share', package_name,'sensors'), glob('sensors/*.*')),
         (os.path.join('share', package_name,'diffdrive_urdf'), glob('diffdrive_urdf/*.*')),
         (os.path.join('share', package_name,'macros'), glob('macros/*.*')),
+        (os.path.join('share', package_name,'ackerman_urdf'), glob('ackerman_urdf/*.*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
