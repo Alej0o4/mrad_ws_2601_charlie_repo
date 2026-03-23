@@ -11,4 +11,7 @@
 
     <xacro:include filename="$(find charlie_description)/sensors/imu.xacro"/> <!-- Camera sensor -->
 
+    <!-- ros2_control -->
+    <xacro:include filename="ros2_control.xacro"/>
+
 </robot>

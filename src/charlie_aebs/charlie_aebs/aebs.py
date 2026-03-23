@@ -51,7 +51,7 @@ class AEBSNode(Node):
         self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_sensor)
 
         # --- PUBLICACIÓN ---
-        self.cmd_pub = self.create_publisher(TwistStamped, '/diffdrive_controller/cmd_vel', 10)
+        self.cmd_pub = self.create_publisher(TwistStamped, '/ackermann_controller/reference', 10)
 
         self.u_k = 0.
 

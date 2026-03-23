@@ -1,0 +1,54 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 30
+
+    ackermann_controller:
+      type: ackermann_steering_controller/AckermannSteeringController
+
+    joint_broadcaster_controller:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+ackermann_controller:
+  ros__parameters:
+    publish_rate: 50.0
+    base_frame_id: base_link
+    enable_odom_tf: false
+
+    # false -> espera geometry_msgs/Twist en /cmd_vel
+    # true  -> espera geometry_msgs/TwistStamped
+    use_stamped_vel: true
+    reference_timeout: 0.5
+
+    # Joints (de tu URDF)
+    traction_joints_names: ["left_rear_wheel_joint", "right_rear_wheel_joint"]
+    steering_joints_names: ["left_steering_wheel_joint", "right_steering_wheel_joint"]
+
+    # Geometría (tomada de tu xacro)
+    # wheelbase = +0.2 - (-0.2) = 0.40
+    wheelbase: 0.40
+    # ancho entre ruedas por eje (y): +0.32 - (-0.32) = 0.64
+    traction_track_width: 0.64
+    steering_track_width: 0.64
+    # rad_w = scale*0.05 = 0.10
+    traction_wheels_radius: 0.10
+
+    # Límites de comando
+    linear:
+      x:
+        has_velocity_limits: true
+        min_velocity: -10.0
+        max_velocity:  10.0
+        has_acceleration_limits: true
+        min_acceleration: -3.0
+        max_acceleration:  3.0
+        has_jerk_limits: false
+
+    angular:
+      z:
+        has_velocity_limits: true
+        min_velocity: -4.0
+        max_velocity:  4.0
+        has_acceleration_limits: true
+        min_acceleration: -2.0
+        max_acceleration:  2.0
+        has_jerk_limits: false

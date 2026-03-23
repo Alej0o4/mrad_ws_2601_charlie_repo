@@ -56,7 +56,7 @@ def generate_launch_description():
         ],
         remappings=[
             # Uncomment if your topics differ:
-            ("/odom", "/diffdrive_controller/odom"),
+            ("/odom", "/ackerman_controller/odom"),
             # ("/imu/data", "/your_imu_topic"),
         ],
     )

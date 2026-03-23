@@ -17,15 +17,15 @@
     <xacro:property name="cam_z" value="${scale*0.025}"/>
 
     <!-- Robot dimensions -->
-    <xacro:property name="rad_w" value="${scale*0.05}"/>
+    <xacro:property name="rad_w" value="${scale*0.05}"/> <!-- Wheel radius 2(scale)*0.05 = 0.10-->
     <xacro:property name="le_w" value="${scale*0.04}"/>
-    <xacro:property name="ly" value="${scale*0.3}"/>
-    <xacro:property name="lx" value="${scale*0.4}"/>
+    <xacro:property name="ly" value="${scale*0.3}"/> <!-- For steering & traction track -->
+    <xacro:property name="lx" value="${scale*0.4}"/> <!-- For wheelbase -->
     <xacro:property name="lz" value="${scale*0.05}"/>
-    <xacro:property name="offset" value="${scale*0.1}"/>
+    <xacro:property name="offset" value="${scale*0.1}"/> <!-- For wheelbase -->
 
     <!-- Steering components -->
-    <xacro:property name="steering_r" value="${scale*0.01}"/>
+    <xacro:property name="steering_r" value="${scale*0.01}"/> <!-- For steering & traction track -->
     <xacro:property name="steering_l" value="${scale*0.15}"/>
 
     <!-- IMU dimensions -->
@@ -158,19 +158,19 @@
     </joint>
 
     <!-- Front Steering Joints -->
-    <joint name="left_steering_wheel_joint" type="revolute">
+    <joint name="left_steering_wheel_joint" type="revolute"> <!-- Steering joint -->
         <parent link="chassis"/>
         <child link="left_steering_link"/>
-        <origin xyz="${lx/2 - offset} ${ly/2+steering_r} -${lz}" rpy="0 0 0"/>
+        <origin xyz="${lx/2 - offset} ${ly/2+steering_r} -${lz}" rpy="0 0 0"/> <!-- For wheelbase --> <!-- For steering & traction track -->
         <axis xyz="0 0 1"/>
         <limit lower="-${pi/4}" upper="${pi/4}" effort="5.0" velocity="1.0"/>
         <dynamics damping="0.5" friction="0.0"/>
     </joint>
 
-    <joint name="right_steering_wheel_joint" type="revolute">
+    <joint name="right_steering_wheel_joint" type="revolute"> <!-- Steering joint -->
         <parent link="chassis"/>
         <child link="right_steering_link"/>
-        <origin xyz="${lx/2 - offset} -${ly/2 + steering_r} -${lz}" rpy="0 0 0"/>
+        <origin xyz="${lx/2 - offset} -${ly/2 + steering_r} -${lz}" rpy="0 0 0"/> <!-- For steering & traction track -->
         <axis xyz="0 0 1"/>
         <limit lower="-${pi/4}" upper="${pi/4}" effort="5.0" velocity="1.0"/>
         <dynamics damping="0.5" friction="0.0"/>
@@ -180,13 +180,13 @@
     <joint name="left_rear_steering_joint" type="fixed">
         <parent link="chassis"/>
         <child link="left_rear_steering_link"/>
-        <origin xyz="-${lx/2-offset} ${ly/2+steering_r} -${lz}" rpy="0 0 0"/>
+        <origin xyz="-${lx/2-offset} ${ly/2+steering_r} -${lz}" rpy="0 0 0"/> <!-- For wheelbase --> <!-- For steering & traction track -->
     </joint>
 
     <joint name="right_rear_steering_joint" type="fixed">
         <parent link="chassis"/>
         <child link="right_rear_steering_link"/>
-        <origin xyz="-${lx/2-offset} -${ly/2+steering_r} -${lz}" rpy="0 0 0"/>
+        <origin xyz="-${lx/2-offset} -${ly/2+steering_r} -${lz}" rpy="0 0 0"/> <!-- For wheelbase --> <!-- For steering & traction track -->
     </joint>
 
     <!-- Wheel Joints -->
@@ -206,15 +206,15 @@
         <dynamics damping="0.2" friction="0.0"/>
     </joint>
 
-    <joint name="left_rear_wheel_joint" type="continuous">
+    <joint name="left_rear_wheel_joint" type="continuous"> <!-- Traction joint -->
         <parent link="left_rear_steering_link"/>
         <child link="left_rear_wheel"/>
         <origin xyz="0.0 ${le_w/2+steering_r} -${steering_l/2-rad_w}" rpy="${pi/2} 0 0"/>
-        <axis xyz="0 0 1"/>
+        <axis xyz="0 0 -1"/>
         <dynamics damping="0.2" friction="0.0"/>
     </joint>
 
-    <joint name="right_rear_wheel_joint" type="continuous">
+    <joint name="right_rear_wheel_joint" type="continuous"> <!-- Traction joint -->
         <parent link="right_rear_steering_link"/>
         <child link="right_rear_wheel"/>
         <origin xyz="0.0 -${le_w/2+steering_r} -${steering_l/2-rad_w}" rpy="${pi/2} 0 0"/>

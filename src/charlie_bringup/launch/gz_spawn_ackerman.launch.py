@@ -10,14 +10,19 @@ from launch_ros.substitutions import FindPackageShare
 
 import xacro
 
+from launch.conditions import IfCondition, UnlessCondition
+
 def generate_launch_description():
     gazebo_pkg_name = "charlie_gazebo"
     bringup_pkg_name = "charlie_bringup"
     description_pkg_name = "charlie_description"
+    aebs_pkg_name = "charlie_aebs"
+    ekf_pkg_name = "charlie_ekf"
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     map_name = LaunchConfiguration("map_name")
     world = LaunchConfiguration("world")
+    headless = LaunchConfiguration("headless")
 
     # --- Robot description (xacro -> URDF XML string) ---
     xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "ackerman_urdf", "robot.urdf.xacro")
@@ -31,7 +36,7 @@ def generate_launch_description():
                      "use_sim_time": use_sim_time}],
     )
 
-    # --- Launch Gazebo (via ros_gz_sim launch file) ---
+    # --- Launch Gazebo (GUI) ---
     gz_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -41,6 +46,20 @@ def generate_launch_description():
             )
         ),
         launch_arguments={"gz_args": ['-r -v4 ', world], 'on_exit_shutdown': 'true'}.items(),
+        condition=UnlessCondition(headless)
+    )
+
+    # --- Launch Gazebo (headless) ---
+    gz_launch_headless = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory("ros_gz_sim"),
+                "launch",
+                "gz_sim.launch.py",
+            )
+        ),
+        launch_arguments={"gz_args": ['-s -r -v4 ', world], 'on_exit_shutdown': 'true'}.items(),
+        condition=IfCondition(headless)
     )
 
     # --- Spawn entity into Gazebo from robot_description topic ---
@@ -49,9 +68,9 @@ def generate_launch_description():
         executable="create",
         output="screen",
         arguments=[
-            "-name", "diffbot",
+            "-name", "ackerman_bot",
             "-topic", "robot_description",
-            "-x", "0.0", "-y", "0.0", "-z", "0.5",
+            "-x", "0.0", "-y", "0.0", "-z", "1.0",
         ],
     )
 
@@ -69,10 +88,10 @@ def generate_launch_description():
         ],
     )
 
-    diff_drive_spawner = Node(
+    ackerman_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["diffdrive_controller"],
+        arguments=["ackermann_controller"],
     )
 
     joint_broad_spawner = Node(
@@ -98,10 +117,28 @@ def generate_launch_description():
 
     twist_mux_params = os.path.join(get_package_share_directory(bringup_pkg_name),'config','twist_mux.yaml')
     
+    # twist_mux_node = Node(package='twist_mux', 
+    #                 executable='twist_mux',
+    #                 parameters=[twist_mux_params,{'use_sim_time': True}],
+    #                 remappings=[('/cmd_vel_out','/ackerman_controller/cmd_vel')]
+    # )
     twist_mux_node = Node(package='twist_mux', 
                     executable='twist_mux',
                     parameters=[twist_mux_params,{'use_sim_time': True}],
-                    remappings=[('/cmd_vel_out','/diffdrive_controller/cmd_vel')]
+                    remappings=[('/cmd_vel_out','/cmd_vel_raw')]
+    )
+
+    aebs_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory(aebs_pkg_name), 'launch', 'aebs.launch.py')
+        )
+    )
+
+    ekf_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory(ekf_pkg_name), 'launch', 'ekf.launch.py')
+        ),
+        launch_arguments={'use_sim_time': use_sim_time}.items()
     )
    
 
@@ -113,7 +150,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "map_name",
-            default_value="walls_practice",
+            default_value="walls_world2",
             description="Nombre del mapa/world a cargar (sin la extensión .sdf)",
             choices=[
                 "walls_world2",
@@ -132,13 +169,21 @@ def generate_launch_description():
             ]),
             description="Full path to world SDF file",
         ),
+        DeclareLaunchArgument(
+            "headless",
+            default_value="true",
+            description="Run Gazebo in headless mode if true",
+        ),
         gz_launch,
+        gz_launch_headless,
         rsp,
         spawn,
         bridge,
-        diff_drive_spawner,
+        ackerman_spawner,
         joint_broad_spawner,
         joy_node,
         teleop_node,
         twist_mux_node,
+        aebs_launch,
+        ekf_launch,
     ])
