@@ -3,6 +3,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, ExecuteProcess
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -19,6 +20,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration("use_sim_time")
     world = LaunchConfiguration("world")
+    headless = LaunchConfiguration("headless")
 
     # --- Robot description (xacro -> URDF XML string) ---
     xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "diffdrive_urdf", "robot.urdf.xacro")
@@ -43,6 +45,19 @@ def generate_launch_description():
             )
         ),
         launch_arguments={"gz_args": ['-r -v4 ', world], 'on_exit_shutdown': 'true'}.items(),
+        condition=UnlessCondition(headless)
+    )
+
+    gz_launch_headless = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory("ros_gz_sim"),
+                "launch",
+                "gz_sim.launch.py",
+            )
+        ),
+        launch_arguments={"gz_args": ['-s -r -v4 ', world], 'on_exit_shutdown': 'true'}.items(),
+        condition=IfCondition(headless) # Se lanza SOLO si headless es true
     )
 
     # --- Spawn entity into Gazebo from robot_description topic ---
@@ -53,8 +68,8 @@ def generate_launch_description():
         arguments=[
             "-name", "diffbot",
             "-topic", "robot_description",
-            #"-x", "-18.0", "-y", "4.35", "-z", "0.5", "-Y", "1.5708"
-            "-x", "0.0", "-y", "0.0", "-z", "0.5", "-Y", "0.0"
+            # "-x", "0.0", "-y", "0.0", "-z", "0.5", "-Y", "0.0"
+            "-x", "-18.0", "-y", "4.0", "-z", "0.5", "-Y", "1.57"
         ],
     )
 
@@ -134,7 +149,13 @@ def generate_launch_description():
             default_value=os.path.join(get_package_share_directory(gazebo_pkg_name), "worlds", "walls_world2.sdf"),
             description="Full path to world SDF file",
         ),
+        DeclareLaunchArgument(
+            "headless",
+            default_value="true",
+            description="Run Gazebo in headless mode if true",
+        ),
         gz_launch,
+        gz_launch_headless,
         rsp,
         spawn,
         bridge,

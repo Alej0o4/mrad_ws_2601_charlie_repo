@@ -1,0 +1,32 @@
+waypoint_manager:
+  ros__parameters:
+    # Modo de funcionamiento
+    use_rviz_clicks: false  # Si es false, usará la lista de abajo
+    num_laps: 2  # Número de vueltas a la pista (solo si use_rviz_clicks es false)
+    
+    # Tu pista de carreras predefinida [x1, y1, x2, y2, ...]
+    static_waypoints: [
+      -18.0, 6.75,
+      -14.5, 7.5,
+      -9.86682, 8.20175,
+      -6.88,5.1,
+      -5.4348, 2.26761,
+      -3.53178, 0.843339,
+      1.54259, 2.66694,
+      3.05147, 6.70499,
+      5.31337, 8.67407,
+      9.86528, 7.33865,
+      11.05, 3.25,
+      11.9724, 1.07583,
+      14.295, -0.523275,
+      19.0665, -1.5575,
+      19.374, -6.1017,
+      12.8045, -6.84838,
+      6.4052, -9.94036,
+      2.60952, -9.06251,
+      0.0, -5.50,
+      -8.82, -5.40,
+      -13.32, -2.71,
+      -17.84, 0.5,
+      -18.0, 6.75
+      ]

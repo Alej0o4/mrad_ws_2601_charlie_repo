@@ -12,7 +12,7 @@ ekf_node:
       publish_tf: true
 
     topics:
-      wheel_odom: /diffdrive_controller/odom"
+      wheel_odom: "/diffdrive_controller/odom"
       imu: "/imu"
 
     # Which wheel odom signals to use (from nav_msgs/Odometry.twist.twist)

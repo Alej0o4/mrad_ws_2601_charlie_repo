@@ -1,8 +1,8 @@
 from setuptools import find_packages, setup
-import os
+import os 
 from glob import glob
 
-package_name = 'charlie_gazebo'
+package_name = 'charlie_path_tracking'
 
 setup(
     name=package_name,
@@ -12,13 +12,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name,'worlds'), glob('worlds/*.*')),
-        (os.path.join('share', package_name,'config'), glob('config/*.*')),
-        (os.path.join('share', package_name,'rviz_config'), glob('rviz_config/*.*')),
-        (os.path.join('share', package_name,'models'), glob('models/*.*')),
-        (os.path.join('share', package_name,'plot_juggler'), glob('plot_juggler/*.*')),
-        (os.path.join('share', package_name,'maps'), glob('maps/*.*')),
-        (os.path.join('share', package_name,'slam_data'), glob('slam_data/*.*')),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -33,6 +28,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'pure_pursuit_v1 = charlie_path_tracking.pure_pursuit_v1:main',
+            'mpc_controller_node = charlie_path_tracking.mpc_controller_node:main',
+            'stanley_node = charlie_path_tracking.stanley_node:main',
         ],
     },
 )
