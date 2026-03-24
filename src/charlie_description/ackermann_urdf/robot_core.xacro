@@ -53,6 +53,9 @@
                 <origin xyz="0 0 0" rpy="0 0 0"/>
             </xacro:inertial_cylinder>
         </link>
+        <gazebo reference="${p_name}">
+            <mu1>1.5</mu1> <mu2>1.5</mu2> <kp>10000000.0</kp> <kd>1.0</kd> <minDepth>0.001</minDepth>
+        </gazebo>
     </xacro:macro>
 
     <xacro:macro name="steering_macro" params="p_name p_radius p_length p_color p_mass">
@@ -162,7 +165,7 @@
         <parent link="chassis"/>
         <child link="left_steering_link"/>
         <origin xyz="${lx/2 - offset} ${ly/2+steering_r} -${lz}" rpy="0 0 0"/> <!-- For wheelbase --> <!-- For steering & traction track -->
-        <axis xyz="0 0 1"/>
+        <axis xyz="0 0 -1"/>
         <limit lower="-${pi/4}" upper="${pi/4}" effort="5.0" velocity="1.0"/>
         <dynamics damping="0.5" friction="0.0"/>
     </joint>
@@ -171,7 +174,7 @@
         <parent link="chassis"/>
         <child link="right_steering_link"/>
         <origin xyz="${lx/2 - offset} -${ly/2 + steering_r} -${lz}" rpy="0 0 0"/> <!-- For steering & traction track -->
-        <axis xyz="0 0 1"/>
+        <axis xyz="0 0 -1"/>
         <limit lower="-${pi/4}" upper="${pi/4}" effort="5.0" velocity="1.0"/>
         <dynamics damping="0.5" friction="0.0"/>
     </joint>

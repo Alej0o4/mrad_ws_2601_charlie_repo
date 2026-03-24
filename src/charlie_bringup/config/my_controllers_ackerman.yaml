@@ -14,6 +14,7 @@ ackermann_controller:
     base_frame_id: base_link
     enable_odom_tf: false
 
+
     # CRÍTICO: Debe ser false para que twist_mux y teleop_twist_joy funcionen por defecto
     use_stamped_vel: false
     reference_timeout: 0.5
@@ -35,8 +36,8 @@ ackermann_controller:
         min_velocity: -10.0
         max_velocity:  10.0
         has_acceleration_limits: true
-        min_acceleration: -3.0
-        max_acceleration:  3.0
+        min_acceleration: -1.0
+        max_acceleration:  1.0
         has_jerk_limits: false
 
     angular:
@@ -45,6 +46,6 @@ ackermann_controller:
         min_velocity: -4.0
         max_velocity:  4.0
         has_acceleration_limits: true
-        min_acceleration: -2.0
-        max_acceleration:  2.0
+        min_acceleration: -5.0
+        max_acceleration:  5.0
         has_jerk_limits: false
