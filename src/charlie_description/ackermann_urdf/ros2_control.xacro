@@ -43,6 +43,17 @@
       <state_interface name="velocity"/>
       <state_interface name="position"/>
     </joint>
+
+    <joint name="left_front_wheel_joint">
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="right_front_wheel_joint">
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
   </ros2_control>
 
   <gazebo>

@@ -14,25 +14,21 @@ ackermann_controller:
     base_frame_id: base_link
     enable_odom_tf: false
 
-    # false -> espera geometry_msgs/Twist en /cmd_vel
-    # true  -> espera geometry_msgs/TwistStamped
-    use_stamped_vel: true
+    # CRÍTICO: Debe ser false para que twist_mux y teleop_twist_joy funcionen por defecto
+    use_stamped_vel: false
     reference_timeout: 0.5
 
-    # Joints (de tu URDF)
+    # Nombres de articulaciones (API Moderna de ROS 2 Jazzy)
     traction_joints_names: ["left_rear_wheel_joint", "right_rear_wheel_joint"]
     steering_joints_names: ["left_steering_wheel_joint", "right_steering_wheel_joint"]
 
-    # Geometría (tomada de tu xacro)
-    # wheelbase = +0.2 - (-0.2) = 0.40
+    # Geometría del chasis
     wheelbase: 0.40
-    # ancho entre ruedas por eje (y): +0.32 - (-0.32) = 0.64
     traction_track_width: 0.64
     steering_track_width: 0.64
-    # rad_w = scale*0.05 = 0.10
     traction_wheels_radius: 0.10
 
-    # Límites de comando
+    # Límites de comando (Mantienes los tuyos, están excelentes)
     linear:
       x:
         has_velocity_limits: true

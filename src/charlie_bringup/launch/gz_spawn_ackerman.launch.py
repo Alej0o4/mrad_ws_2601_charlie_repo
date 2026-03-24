@@ -25,7 +25,7 @@ def generate_launch_description():
     headless = LaunchConfiguration("headless")
 
     # --- Robot description (xacro -> URDF XML string) ---
-    xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "ackerman_urdf", "robot.urdf.xacro")
+    xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "ackermann_urdf", "robot.urdf.xacro")
     robot_description = xacro.process_file(xacro_file).toxml()
 
     rsp = Node(
@@ -68,9 +68,9 @@ def generate_launch_description():
         executable="create",
         output="screen",
         arguments=[
-            "-name", "ackerman_bot",
+            "-name", "ackermann_bot",
             "-topic", "robot_description",
-            "-x", "0.0", "-y", "0.0", "-z", "1.0",
+            "-x", "0.0", "-y", "0.0", "-z", "2.0",
         ],
     )
 
@@ -88,7 +88,7 @@ def generate_launch_description():
         ],
     )
 
-    ackerman_spawner = Node(
+    ackermann_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=["ackermann_controller"],
@@ -105,23 +105,18 @@ def generate_launch_description():
     # Run the spawner node from the gazebo_ros package. The entity name doesn't really matter if you only have a single robot.
     joy_node = Node(package='joy', 
                     executable='joy_node',
-                    parameters=[joy_params],
+                    parameters=[joy_params,{'use_sim_time': use_sim_time}],
     )
 
     teleop_node = Node(package='teleop_twist_joy', 
                     executable='teleop_node',
                     name="teleop_node",
-                    parameters=[joy_params],
+                    parameters=[joy_params,{'use_sim_time': use_sim_time}],
                     remappings=[('/cmd_vel','/cmd_vel_joy')]
     )
 
     twist_mux_params = os.path.join(get_package_share_directory(bringup_pkg_name),'config','twist_mux.yaml')
     
-    # twist_mux_node = Node(package='twist_mux', 
-    #                 executable='twist_mux',
-    #                 parameters=[twist_mux_params,{'use_sim_time': True}],
-    #                 remappings=[('/cmd_vel_out','/ackerman_controller/cmd_vel')]
-    # )
     twist_mux_node = Node(package='twist_mux', 
                     executable='twist_mux',
                     parameters=[twist_mux_params,{'use_sim_time': True}],
@@ -179,7 +174,7 @@ def generate_launch_description():
         rsp,
         spawn,
         bridge,
-        ackerman_spawner,
+        ackermann_spawner,
         joint_broad_spawner,
         joy_node,
         teleop_node,
