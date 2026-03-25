@@ -1,8 +1,6 @@
 from setuptools import find_packages, setup
-import os
-from glob import glob
 
-package_name = 'charlie_bringup'
+package_name = 'charlie_rpi5'
 
 setup(
     name=package_name,
@@ -12,8 +10,6 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name,'launch'), glob('launch/*.*')),
-        (os.path.join('share', package_name,'config'), glob('config/*.*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -28,8 +24,6 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'path_recorder = charlie_bringup.path_recorder:main',
-            'vicon_to_odom_node = charlie_bringup.pose2odom_node:main',
         ],
     },
 )

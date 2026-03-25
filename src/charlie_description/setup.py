@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name,'sensors'), glob('sensors/*.*')),
         (os.path.join('share', package_name,'diffdrive_urdf'), glob('diffdrive_urdf/*.*')),
+        (os.path.join('share', package_name,'vicon_urdf'), glob('vicon_urdf/*.*')),
         (os.path.join('share', package_name,'macros'), glob('macros/*.*')),
     ],
     install_requires=['setuptools'],
