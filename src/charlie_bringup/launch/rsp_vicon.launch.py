@@ -15,6 +15,7 @@ import xacro
 def generate_launch_description():
     bringup_pkg_name = "charlie_bringup"
     description_pkg_name = "charlie_description"
+    aebs_pkg_name = "charlie_aebs"
 
     robot_name = "vicon_urdf"
     use_sim_time = LaunchConfiguration("use_sim_time")
@@ -43,6 +44,35 @@ def generate_launch_description():
         output='screen'
     )
 
+    joy_params = os.path.join(get_package_share_directory(bringup_pkg_name),'config','joystick.yaml')
+
+    # Run the spawner node from the gazebo_ros package. The entity name doesn't really matter if you only have a single robot.
+    joy_node = Node(package='joy', 
+                    executable='joy_node',
+                    parameters=[joy_params],
+    )
+
+    teleop_node = Node(package='teleop_twist_joy', 
+                    executable='teleop_node',
+                    name="teleop_node",
+                    parameters=[joy_params],
+                    remappings=[('/cmd_vel','/cmd_vel_joy')]
+    )
+
+    twist_mux_params = os.path.join(get_package_share_directory(bringup_pkg_name),'config','twist_mux.yaml')
+    
+    twist_mux_node = Node(package='twist_mux', 
+                    executable='twist_mux',
+                    parameters=[twist_mux_params,{'use_sim_time': True}],
+                    remappings=[('/cmd_vel_out','/cmd_vel_raw')]
+    )
+
+    aebs_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory(aebs_pkg_name), 'launch', 'aebs.launch.py')
+        )
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -51,5 +81,10 @@ def generate_launch_description():
                 description="Use simulation (Gazebo) clock if true",
             ),
             rsp,
+            vicon_odom_node,
+            joy_node,
+            teleop_node,
+            twist_mux_node,
+            aebs_launch
         ]
     )

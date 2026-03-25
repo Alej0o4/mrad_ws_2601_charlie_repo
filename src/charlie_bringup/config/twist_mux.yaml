@@ -19,7 +19,3 @@ twist_mux:
         topic   : cmd_vel_ctrl
         timeout : 0.5
         priority: 75
-      safety:
-        topic   : cmd_vel_aebs
-        timeout : 0.5     
-        priority: 200

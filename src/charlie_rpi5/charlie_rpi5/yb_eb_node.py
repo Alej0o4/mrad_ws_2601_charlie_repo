@@ -3,9 +3,10 @@ import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import Float32
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TwistStamped
 from sensor_msgs.msg import Imu,MagneticField
 from rclpy.clock import Clock
+from rclpy.qos import qos_profile_sensor_data
 
 from Rosmaster_Lib import Rosmaster
 
@@ -18,22 +19,23 @@ class TWIST_CMD_NODE(Node): # reemplazar YY por el numero de grupo
 
         # create a topic subscriber
         # obj (msg_type,topic_name, callback_handler, buffer) 
-        self.twist_subs = self.create_subscription(Twist,'/cmd_vel',self.twist_callback,1)
+        self.twist_subs = self.create_subscription(TwistStamped,'/cmd_vel_raw',self.twist_callback,1)
 
         # create a timer function to send msg
-        timer_period = 0.5 # in [s]
+        timer_period = 0.1 # in [s]
         self.timer = self.create_timer(timer_period,self.timer_callback)
 
 
-        self.imuPublisher = self.create_publisher(Imu,"/imu/data_raw",100)
-        self.magPublisher = self.create_publisher(MagneticField,"/imu/mag",100)
-        self.volPublisher = self.create_publisher(Float32,"voltage",100)
+# ... dentro del __init__ ...
+        self.imuPublisher = self.create_publisher(Imu, "/imu/data_raw", qos_profile_sensor_data)
+        self.magPublisher = self.create_publisher(MagneticField,"/imu/mag",qos_profile_sensor_data)
+        self.volPublisher = self.create_publisher(Float32,"voltage",qos_profile_sensor_data)
 
         #robot Create the Rosmaster object bot
         self.robot = Rosmaster()
         self.robot.create_receive_threading()
 
-        self.cmd_vel = Twist()
+        self.cmd_vel = TwistStamped()
 
     def timer_callback(self):
 
@@ -75,22 +77,28 @@ class TWIST_CMD_NODE(Node): # reemplazar YY por el numero de grupo
 
         # def twist variable
 
-        throttle = self.map(self.cmd_vel.linear.x, -0.5, +0.5, 47.5, 132.5)
-        steering = self.map(self.cmd_vel.angular.z, -0.5, +0.5, 47.5, 132.5)
-        msg = 'xd: {:.3f},{:.3f}, Thd: {:.3f},{:.3f}'.format(self.cmd_vel.linear.x,throttle,self.cmd_vel.angular.z,steering)
+        throttle = self.map_and_clamp(self.cmd_vel.twist.linear.x, -0.5, +0.5, 47.5, 132.5)
+        steering = self.map_and_clamp(self.cmd_vel.twist.angular.z, -0.5, +0.5, 47.5, 132.5)
+        msg = 'xd: {:.3f},{:.3f}, Thd: {:.3f},{:.3f}'.format(
+            self.cmd_vel.twist.linear.x, throttle,
+            self.cmd_vel.twist.angular.z, steering
+        )
         self.get_logger().info(msg)
 
-        self.robot.set_pwm_servo(1,throttle)
-        self.robot.set_pwm_servo(2,steering)
+        self.robot.set_pwm_servo(1, throttle)
+        self.robot.set_pwm_servo(2, steering)
 
 
-    def twist_callback(self,data):
-        msg = 'xd: {:.3f}, Thd: {:.3f}'.format(data.linear.x,data.angular.z)
+    def twist_callback(self, data):
+        msg = 'xd: {:.3f}, Thd: {:.3f}'.format(data.twist.linear.x, data.twist.angular.z)
         self.get_logger().info(msg)
-        self.cmd_vel.linear.x = data.linear.x
-        self.cmd_vel.angular.z = data.angular.z
-
-    def map(self,x, in_min, in_max, out_min, out_max):
+        self.cmd_vel.twist.linear.x = data.twist.linear.x
+        self.cmd_vel.twist.angular.z = data.twist.angular.z
+    
+    def map_and_clamp(self, x, in_min, in_max, out_min, out_max):
+        # 1. Saturar (Clamp) la entrada para no exceder límites físicos
+        x = max(in_min, min(x, in_max))
+        # 2. Mapear
         return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
     
     def kill(self):
