@@ -77,7 +77,7 @@ class TWIST_CMD_NODE(Node): # reemplazar YY por el numero de grupo
 
         # def twist variable
 
-        throttle = self.map_and_clamp(self.cmd_vel.twist.linear.x, -0.5, +0.5, 47.5, 132.5)
+        throttle = self.map_and_clamp(self.cmd_vel.twist.linear.x, -0.5, +0.5, 80.0, 100.0)
         steering = self.map_and_clamp(self.cmd_vel.twist.angular.z, -0.5, +0.5, 47.5, 132.5)
         msg = 'xd: {:.3f},{:.3f}, Thd: {:.3f},{:.3f}'.format(
             self.cmd_vel.twist.linear.x, throttle,
