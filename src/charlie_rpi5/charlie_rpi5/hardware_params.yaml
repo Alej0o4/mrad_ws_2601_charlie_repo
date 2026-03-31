@@ -1,7 +1,7 @@
 twist_cmd_node_charlie: # <-- Este nombre DEBE coincidir con el que pusiste en super().__init__()
   ros__parameters:
     # Topicos
-    cmd_vel_topic: '/cmd_vel'  # Ojo: Si cambias a /cmd_vel_raw, asegúrate que el twist_mux o MPC publique ahí.
+    cmd_vel_topic: '/cmd_vel_raw'  # Ojo: Si cambias a /cmd_vel_raw, asegúrate que el twist_mux o MPC publique ahí.
     imu_topic: '/imu/data_raw'
     mag_topic: '/imu/mag'
     voltage_topic: 'voltage'
@@ -9,11 +9,11 @@ twist_cmd_node_charlie: # <-- Este nombre DEBE coincidir con el que pusiste en s
     # Calibración del Motor Principal (Tracción)
     throttle:
       V_MAX: 0.5
+      PWM_MAX_FWD: 120.0
+      PWM_MIN_FWD: 99.0
       PWM_CENTER: 90.0
-      PWM_MIN_FWD: 102.0
-      PWM_MAX_FWD: 132.5
-      PWM_MIN_REV: 76.0
-      PWM_MAX_REV: 47.5
+      PWM_MIN_REV: 83.4
+      PWM_MAX_REV: 60.0
 
     # Calibración del Servo de Dirección (Ackermann)
     steering:

@@ -28,6 +28,13 @@ class AEBSNode(Node):
         self.effective_ttc = self.base_ttc 
         self.u_k = 0.0 # Velocidad actual del robot (para suavizado)
         self.alpha = 0.4 # Factor de suavizado para la velocidad (0.0 = sin suavizado, 1.0 = muy suave)
+
+        # [NEW] Control de latencia y salud del sensor
+        self.last_scan_time = self.get_clock().now()
+        self.scan_timeout_sec = 0.5 # 500 ms sin datos = Freno automático
+        
+        # [NEW] Precomputar ángulos genéricos (evita recalcular el linspace)
+        self.base_angles = None
         
         # [NEW] Calculamos el umbral inicial según el modo configurado
         self.update_thresholds()
@@ -99,18 +106,31 @@ class AEBSNode(Node):
         return SetParametersResult(successful=True)
 
     def scan_callback(self, msg):
-        self.ranges = np.array(msg.ranges)
+        # Actualizamos la marca de tiempo vital
+        self.last_scan_time = self.get_clock().now()
         
-        if self.angles is None or len(self.angles) != len(msg.ranges):
-            self.angles = np.linspace(msg.angle_min, msg.angle_max, len(msg.ranges))
+        raw_ranges = np.array(msg.ranges)
+        
+        if self.base_angles is None or len(self.base_angles) != len(raw_ranges):
+            self.base_angles = np.linspace(msg.angle_min, msg.angle_max, len(raw_ranges))
             
-        valid = np.isfinite(self.ranges) & (self.ranges > msg.range_min) & (self.ranges < msg.range_max)
-        self.ranges = self.ranges[valid]
-        self.angles = self.angles[valid]
+        # Filtro Sim2Real: Eliminar NaN, Inf y lecturas de 0.0 típicas del A1
+        valid = np.isfinite(raw_ranges) & (raw_ranges > 0.01) & (raw_ranges < msg.range_max)
+        
+        # Guardamos en variables temporales locales para no destruir las formas base
+        self.ranges = raw_ranges[valid]
+        self.angles = self.base_angles[valid]
 
     def cmd_callback(self, msg):
         if self.ranges is None: 
             return 
+
+        # [CRÍTICO] Chequeo de salud del sensor (Watchdog)
+        time_since_last_scan = (self.get_clock().now() - self.last_scan_time).nanoseconds / 1e9
+        if time_since_last_scan > self.scan_timeout_sec:
+            self.get_logger().fatal("¡PÉRDIDA DE SEÑAL LIDAR! Aplicando freno de emergencia.")
+            self.stop_robot(msg, 0.0)
+            return
 
         vx = msg.twist.linear.x
         
@@ -121,7 +141,6 @@ class AEBSNode(Node):
         is_safe = True
         min_ttc = float('inf')
 
-        # --- SELECCIÓN DE ALGORITMO ---
         if self.mode == 'tunnel':
             is_safe, min_ttc = self.check_tunnel_safety(vx)
         elif self.mode == 'radial':
@@ -155,9 +174,9 @@ class AEBSNode(Node):
             ttc_values = ttc_values[ttc_values > 0] 
 
             if len(ttc_values) > 0:
-                min_ttc = np.min(ttc_values)
-                # [NEW] Usamos effective_ttc en lugar de self.ttc_min
-                if min_ttc < self.effective_ttc:
+                danger_rays = ttc_values[ttc_values < self.effective_ttc]
+                if len(danger_rays) >= 3: # Umbral de consenso Sim2Real
+                    min_ttc = np.min(danger_rays)
                     return False, min_ttc 
 
         return True, 0.0

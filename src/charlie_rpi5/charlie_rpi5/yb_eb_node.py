@@ -20,9 +20,9 @@ class TWIST_CMD_NODE(Node): # reemplazar YY por el numero de grupo
         # Parámetros de mapeo y compensación para throttle
         self.declare_parameter('throttle.V_MAX', 0.5)    # Velocidad máxima de tu modelo
         self.declare_parameter('throttle.PWM_CENTER', 90.0)
-        self.declare_parameter('throttle.PWM_MIN_FWD', 102.0)  # <- Valor donde apenas se mueve adelante
+        self.declare_parameter('throttle.PWM_MIN_FWD', 99.0)  # <- Valor donde apenas se mueve adelante
         self.declare_parameter('throttle.PWM_MAX_FWD', 132.5)  # <- Valor máximo adelante
-        self.declare_parameter('throttle.PWM_MIN_REV', 76.0)   # <- Valor donde apenas se mueve en reversa
+        self.declare_parameter('throttle.PWM_MIN_REV', 83.4)   # <- Valor donde apenas se mueve en reversa
         self.declare_parameter('throttle.PWM_MAX_REV', 47.5)   # <- Valor máximo en reversa
         # Parámetros de mapeo para steering
         self.declare_parameter('steering.ANGLE_MAX', 0.5)
