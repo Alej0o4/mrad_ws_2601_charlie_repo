@@ -12,10 +12,12 @@ class AEBSNode(Node):
         super().__init__('aebs_node')
 
         # --- PARÁMETROS ---
-        self.declare_parameter('robot_width', 0.44)
+        self.declare_parameter('robot_width', 0.40)
         self.declare_parameter('ttc_threshold', 0.7) # Este es el valor BASE (para Tunnel)
         self.declare_parameter('aebs_mode', 'tunnel') 
         self.declare_parameter('safety_factor', 2.0) # Factor de seguridad para ajustar el umbral dinámicamente
+        self.declare_parameter('lidar_yaw_offset', 3.14159)
+        self.declare_parameter('chassis_length', 0.37)
         
         # Carga inicial de valores
         self.width = self.get_parameter('robot_width').value
@@ -23,6 +25,8 @@ class AEBSNode(Node):
         self.mode = self.get_parameter('aebs_mode').value
         self.safety_factor = self.get_parameter('safety_factor').value
         self.half_width = (self.width / 2.0) + 0.1 
+        self.yaw_offset = self.get_parameter('lidar_yaw_offset').value
+        self.bumper_x = self.get_parameter('chassis_length').value / 2.0
 
         # [NEW] Variable para el TTC efectivo (el que realmente se usa)
         self.effective_ttc = self.base_ttc 
@@ -106,18 +110,20 @@ class AEBSNode(Node):
         return SetParametersResult(successful=True)
 
     def scan_callback(self, msg):
-        # Actualizamos la marca de tiempo vital
         self.last_scan_time = self.get_clock().now()
-        
         raw_ranges = np.array(msg.ranges)
         
         if self.base_angles is None or len(self.base_angles) != len(raw_ranges):
-            self.base_angles = np.linspace(msg.angle_min, msg.angle_max, len(raw_ranges))
+            # 1. Generar ángulos crudos del sensor
+            angles = np.linspace(msg.angle_min, msg.angle_max, len(raw_ranges))
+            # 2. Aplicar rotación física (Alineación con base_link)
+            angles += self.yaw_offset
+            # 3. Normalizar ángulos entre -pi y pi para evitar distorsión en funciones trigonométricas
+            self.base_angles = np.arctan2(np.sin(angles), np.cos(angles))
             
-        # Filtro Sim2Real: Eliminar NaN, Inf y lecturas de 0.0 típicas del A1
-        valid = np.isfinite(raw_ranges) & (raw_ranges > 0.01) & (raw_ranges < msg.range_max)
+        # Filtro Sim2Real Reforzado: Elevamos el mínimo a 15cm (0.15m) para no ver los tornillos del chasis
+        valid = np.isfinite(raw_ranges) & (raw_ranges > 0.15) & (raw_ranges < msg.range_max)
         
-        # Guardamos en variables temporales locales para no destruir las formas base
         self.ranges = raw_ranges[valid]
         self.angles = self.base_angles[valid]
 
@@ -162,22 +168,41 @@ class AEBSNode(Node):
         y_points = self.ranges * np.sin(self.angles)
 
         if vx > 0:
-            direction_mask = x_points > 0
-        else:
-            direction_mask = x_points < 0
+            # 1. Miramos solo lo que está adelante del parachoques frontal
+            direction_mask = x_points > self.bumper_x
+            tunnel_mask = direction_mask & (np.abs(y_points) < self.half_width)
+            dangers_x = x_points[tunnel_mask]
+            
+            if len(dangers_x) > 0:
+                # [CORRECCIÓN CRÍTICA]: TTC real = (Distancia al LiDAR - Longitud al parachoques) / velocidad
+                real_distances = dangers_x - self.bumper_x
+                ttc_values = real_distances / vx 
+                
+                ttc_values = ttc_values[ttc_values > 0] 
+                if len(ttc_values) > 0:
+                    danger_rays = ttc_values[ttc_values < self.effective_ttc]
+                    if len(danger_rays) >= 3: # Umbral de consenso Sim2Real
+                        min_ttc = np.min(danger_rays)
+                        return False, min_ttc 
 
-        tunnel_mask = direction_mask & (np.abs(y_points) < self.half_width)
-        dangers_x = x_points[tunnel_mask]
-        
-        if len(dangers_x) > 0:
-            ttc_values = dangers_x / vx 
-            ttc_values = ttc_values[ttc_values > 0] 
-
-            if len(ttc_values) > 0:
-                danger_rays = ttc_values[ttc_values < self.effective_ttc]
-                if len(danger_rays) >= 3: # Umbral de consenso Sim2Real
-                    min_ttc = np.min(danger_rays)
-                    return False, min_ttc 
+        else: # Movimiento en REVERSA
+            # 1. Miramos solo lo que está detrás del parachoques trasero
+            direction_mask = x_points < -self.bumper_x
+            tunnel_mask = direction_mask & (np.abs(y_points) < self.half_width)
+            dangers_x = x_points[tunnel_mask]
+            
+            if len(dangers_x) > 0:
+                # [CORRECCIÓN CRÍTICA]: Ambos 'dangers_x' y 'bumper_x' son negativos aquí.
+                # Al sumarlos y dividirlos por vx (que también es negativo), el TTC da positivo.
+                real_distances = dangers_x + self.bumper_x
+                ttc_values = real_distances / vx
+                
+                ttc_values = ttc_values[ttc_values > 0] 
+                if len(ttc_values) > 0:
+                    danger_rays = ttc_values[ttc_values < self.effective_ttc]
+                    if len(danger_rays) >= 3: 
+                        min_ttc = np.min(danger_rays)
+                        return False, min_ttc 
 
         return True, 0.0
 
@@ -192,15 +217,22 @@ class AEBSNode(Node):
             relevant_ranges = self.ranges[danger_mask]
             relevant_speeds = closing_speeds[danger_mask]
 
-            ttc_values = relevant_ranges / relevant_speeds
-            min_ttc = np.min(ttc_values)
+            # [CORRECCIÓN CRÍTICA]: Restamos el radio de impacto aproximado del robot
+            real_distances = relevant_ranges - self.bumper_x
+            
+            # Evitamos procesar distancias que ya cruzaron el límite por error de hardware
+            valid_dist_mask = real_distances > 0.0
+            
+            ttc_values = real_distances[valid_dist_mask] / relevant_speeds[valid_dist_mask]
+            
+            if len(ttc_values) > 0:
+                min_ttc = np.min(ttc_values)
 
-            # [NEW] Usamos effective_ttc (que aquí será el doble)
-            if min_ttc < self.effective_ttc:
-                return False, min_ttc 
+                if min_ttc < self.effective_ttc:
+                    return False, min_ttc 
 
         return True, 0.0
-
+    
     def stop_robot(self, original_msg, ttc_val):
         direction_str = "ADELANTE" if original_msg.twist.linear.x > 0 else "ATRÁS"
         # Logueamos qué límite disparó el freno
