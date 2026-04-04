@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 30
+    update_rate: 50
 
     ackermann_controller:
       type: ackermann_steering_controller/AckermannSteeringController
