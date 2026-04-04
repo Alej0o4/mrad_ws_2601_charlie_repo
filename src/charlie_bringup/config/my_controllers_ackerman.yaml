@@ -24,10 +24,10 @@ ackermann_controller:
     traction_joints_names: ["leftb_wheel_joint", "rightb_wheel_joint"]
     steering_joints_names: ["left_steering_joint", "right_steering_joint"] # <--- CAMBIO AQUÍ
 
-    # Geometría del chasis
+    # Geometría del chasis CORREGIDA
     wheelbase: 0.257
-    traction_track_width: 0.155
-    steering_track_width: 0.155
+    traction_track_width: 0.225  # ANTES 0.155
+    steering_track_width: 0.225  # ANTES 0.155
     traction_wheels_radius: 0.053
 
     # Límites de comando (Mantienes los tuyos, están excelentes)

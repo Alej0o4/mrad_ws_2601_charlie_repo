@@ -46,6 +46,14 @@
                 <origin xyz="0 0 0" rpy="0 0 0"/>
             </xacro:inertial_cylinder>
         </link>
+        <gazebo reference="${p_name}">
+            <mu1>1.0</mu1>          
+            <mu2>0.5</mu2>          
+            <kp>10000000.0</kp>     
+            <kd>1.0</kd>            
+            <minDepth>0.001</minDepth> 
+            <maxVel>0.1</maxVel>    
+        </gazebo>
     </xacro:macro>
 
     <xacro:macro name="barras" params="p_name p_x p_y p_z">
