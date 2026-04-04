@@ -12,7 +12,8 @@ ackermann_controller:
   ros__parameters:
     publish_rate: 50.0
     base_frame_id: base_link
-    enable_odom_tf: false
+    odom_frame_id: odom        # [NUEVO] Asegura explícitamente el nombre del frame
+    enable_odom_tf: true       # [CAMBIO CRÍTICO] Activa la publicación directa al /tf
 
 
     # CRÍTICO: Debe ser false para que twist_mux y teleop_twist_joy funcionen por defecto

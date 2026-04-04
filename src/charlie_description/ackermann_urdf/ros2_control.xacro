@@ -56,10 +56,16 @@
 
   </ros2_control>
 
-  <gazebo>
+<gazebo>
     <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="libgz_ros2_control-system.so">
       <parameters>$(find charlie_bringup)/config/my_controllers_ackerman.yaml</parameters>
       <parameters>$(find charlie_bringup)/config/gaz_ros2_ctl_use_sim.yaml</parameters>
+      
+      <ros>
+        <remapping>/ackermann_controller/tf_odometry:=/tf</remapping>
+        
+        <remapping>/ackermann_controller/odometry:=/odom</remapping>
+      </ros>
     </plugin>
   </gazebo>
 
