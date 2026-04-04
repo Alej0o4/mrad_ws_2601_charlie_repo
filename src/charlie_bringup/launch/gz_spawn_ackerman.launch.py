@@ -23,6 +23,7 @@ def generate_launch_description():
     map_name = LaunchConfiguration("map_name")
     world = LaunchConfiguration("world")
     headless = LaunchConfiguration("headless")
+    joy = LaunchConfiguration("joy")
 
     # --- Robot description (xacro -> URDF XML string) ---
     xacro_file = os.path.join(get_package_share_directory(description_pkg_name), "ackermann_urdf", "robot.urdf.xacro")
@@ -106,13 +107,25 @@ def generate_launch_description():
     joy_node = Node(package='joy', 
                     executable='joy_node',
                     parameters=[joy_params,{'use_sim_time': use_sim_time}],
+                    condition=IfCondition(joy)
     )
 
     teleop_node = Node(package='teleop_twist_joy', 
                     executable='teleop_node',
                     name="teleop_node",
                     parameters=[joy_params,{'use_sim_time': use_sim_time}],
-                    remappings=[('/cmd_vel','/cmd_vel_joy')]
+                    remappings=[('/cmd_vel','/cmd_vel_joy')],
+                    condition=IfCondition(joy)
+    )
+
+    keyboard_teleop_node = Node(
+        package='teleop_twist_keyboard',
+        executable='teleop_twist_keyboard',
+        name='teleop_keyboard',
+        output='screen',
+        emulate_tty=True,
+        remappings=[('/cmd_vel', '/cmd_vel_joy')],
+        condition=UnlessCondition(joy)
     )
 
     twist_mux_params = os.path.join(get_package_share_directory(bringup_pkg_name),'config','twist_mux.yaml')
@@ -169,6 +182,11 @@ def generate_launch_description():
             default_value="true",
             description="Run Gazebo in headless mode if true",
         ),
+        DeclareLaunchArgument(
+            "joy",
+            default_value="true",
+            description="If true, use joystick teleop. If false, use keyboard teleop.",
+        ),
         gz_launch,
         gz_launch_headless,
         rsp,
@@ -178,6 +196,7 @@ def generate_launch_description():
         joint_broad_spawner,
         joy_node,
         teleop_node,
+        # keyboard_teleop_node,
         twist_mux_node,
         aebs_launch,
         ekf_launch,

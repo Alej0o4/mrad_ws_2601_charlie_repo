@@ -19,15 +19,15 @@ ackermann_controller:
     use_stamped_vel: false
     reference_timeout: 0.5
 
-    # Nombres de articulaciones (API Moderna de ROS 2 Jazzy)
-    traction_joints_names: ["left_rear_wheel_joint", "right_rear_wheel_joint"]
-    steering_joints_names: ["left_steering_wheel_joint", "right_steering_wheel_joint"]
+    # Nombres de articulaciones del carro real
+    traction_joints_names: ["leftb_wheel_joint", "rightb_wheel_joint"]
+    steering_joints_names: ["chassis_horizontalbar_4", "chassis_horizontalbar_3"]
 
     # Geometría del chasis
-    wheelbase: 0.40
-    traction_track_width: 0.64
-    steering_track_width: 0.64
-    traction_wheels_radius: 0.10
+    wheelbase: 0.257
+    traction_track_width: 0.155
+    steering_track_width: 0.155
+    traction_wheels_radius: 0.053
 
     # Límites de comando (Mantienes los tuyos, están excelentes)
     linear:
