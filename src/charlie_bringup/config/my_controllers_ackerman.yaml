@@ -21,7 +21,7 @@ ackermann_controller:
 
     # Nombres de articulaciones del carro real
     traction_joints_names: ["leftb_wheel_joint", "rightb_wheel_joint"]
-    steering_joints_names: ["chassis_horizontalbar_4", "chassis_horizontalbar_3"]
+    steering_joints_names: ["left_steering_joint", "right_steering_joint"] # <--- CAMBIO AQUÍ
 
     # Geometría del chasis
     wheelbase: 0.257

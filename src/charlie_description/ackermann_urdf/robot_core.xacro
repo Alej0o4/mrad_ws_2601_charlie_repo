@@ -4,7 +4,6 @@
     <!-- Include macros -->
     <xacro:include filename="$(find charlie_description)/macros/inertial_macros.xacro"/>
 
-    <!--Measurements-->
     <xacro:property name="rad_w" value="0.053"/>
     <xacro:property name="le_w" value="0.045"/>
     <xacro:property name="ly" value="0.11072"/>
@@ -20,8 +19,17 @@
     <xacro:property name="imu_ly" value="0.03"/>
     <xacro:property name="imu_lz" value="0.01"/>
 
+    <xacro:macro name="phantom_steer_link" params="p_name">
+        <link name="${p_name}">
+            <inertial>
+                <mass value="0.05"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+            </inertial>
+        </link>
+    </xacro:macro>
+
     <xacro:macro name="wheel_macro" params="p_name p_radius p_width">
-    <!-- ... -->
         <link name="${p_name}">
             <visual>
                 <geometry>
@@ -33,7 +41,6 @@
                 <geometry>
                     <sphere radius="${p_radius}" />
                 </geometry>
-
             </collision>
             <xacro:inertial_cylinder mass="0.1" length="${p_width}" radius="${p_radius}">
                 <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -42,7 +49,6 @@
     </xacro:macro>
 
     <xacro:macro name="barras" params="p_name p_x p_y p_z">
-    <!-- ... -->
         <link name="${p_name}">
             <visual>
                 <origin xyz="0 0 0"/>
@@ -64,7 +70,6 @@
     </xacro:macro>
 
     <xacro:macro name="barra_horizontal" params="p_name p_x p_y p_z origin">
-    <!-- ... -->
         <link name="${p_name}">
             <visual>
                 <origin xyz="0 ${origin} 0"/>
@@ -85,9 +90,7 @@
         </link>
     </xacro:macro>
 
-    <!-- Example link -->
-    <link name="base_link">
-    </link>
+    <link name="base_link"></link>
 
     <joint name="base_link_joint" type="fixed">
         <parent link="base_link"/>
@@ -139,54 +142,40 @@
         </xacro:inertial_box>
     </link>
 
-    <!--Pata trasera derecha-->
     <joint name="chassis_verticalbar_1" type="fixed">
         <parent link="chassis"/>
         <child link="barra_vertical_tr_link"/>
-        <origin xyz="${0.257/2} ${ly/3} ${bscz+0.008}"/>    
+        <origin xyz="${-0.257/2} ${ly/3} ${bscz+0.008}"/>    
     </joint>
-
     <xacro:barras p_name="barra_vertical_tr_link" p_x="${bscx}" p_y="${bscy}" p_z="${bscz}"/>
 
-    <!--Pata trasera izquierda-->
     <joint name="chassis_verticalbar_2" type="fixed">
         <parent link="chassis"/>
         <child link="barra_vertical_tr_l_link"/>
-        <origin xyz="${0.257/2} ${-ly/3} ${bscz+0.008}"/>    
+        <origin xyz="${-0.257/2} ${-ly/3} ${bscz+0.008}"/>    
     </joint>
-
     <xacro:barras p_name="barra_vertical_tr_l_link" p_x="${bscx}" p_y="${bscy}" p_z="${bscz}"/>
 
-    <!--Pata delantera derecha-->
     <joint name="chassis_verticalbar_3" type="fixed">
         <parent link="chassis"/>
         <child link="barra_vertical_de_link"/>
-        <origin xyz="${-0.257/2} ${ly/3} ${bscz+0.008}"/>    
+        <origin xyz="${0.257/2} ${ly/3} ${bscz+0.008}"/>    
     </joint>
-
     <xacro:barras p_name="barra_vertical_de_link" p_x="${bscx}" p_y="${bscy}" p_z="${bscz}"/>
 
-    <!--Pata trasera izquierda-->
     <joint name="chassis_verticalbar_4" type="fixed">
         <parent link="chassis"/>
         <child link="barra_vertical_de_l_link"/>
-        <origin xyz="${-0.257/2} ${-ly/3} ${bscz+0.008}"/>    
+        <origin xyz="${0.257/2} ${-ly/3} ${bscz+0.008}"/>    
     </joint>
-
-    
-
     <xacro:barras p_name="barra_vertical_de_l_link" p_x="${bscx}" p_y="${bscy}" p_z="${bscz}"/>
 
-    <!--Barra trasera derecha-->
-    <joint name="chassis_horizontalbar_1" type="revolute">
+
+    <joint name="chassis_horizontalbar_tr" type="fixed">
         <parent link="chassis"/>
         <child link="barra_horizontal_tr_link"/>
-        <origin xyz="${0.257/2} 0.035  ${-(lz+bhz)/2}" rpy="0 0 0"/>
-        <axis xyz="0 0 1"/>
-        <limit effort="1" lower="-${pi/4}" upper="${pi/4}" velocity="1"/>
-        <dynamics damping="0.2" friction="0"/> 
+        <origin xyz="${-0.257/2} 0.035  ${-(lz+bhz)/2}" rpy="0 0 0"/>
     </joint>
-
     <xacro:barra_horizontal p_name="barra_horizontal_tr_link" p_x="${bhx}" p_y="${bhy}" p_z="${bhz}" origin="${0.0175}"/>
 
     <joint name="rightb_wheel_joint" type="continuous">
@@ -196,20 +185,14 @@
         <axis xyz="0 0 1"/>    
         <dynamics damping="0.2" friction="0.0"/>
     </joint>
-
     <xacro:wheel_macro p_name="rightb_wheel" p_radius="${rad_w}" p_width="${le_w}"/>
 
-      <!--Barra trasera izquierda-->
 
-    <joint name="chassis_horizontalbar_2" type="revolute">
+    <joint name="chassis_horizontalbar_ti" type="fixed">
         <parent link="chassis"/>
         <child link="barra_horizontal_ti_link"/>
-        <origin xyz="${0.257/2} -0.035  ${-(lz+bhz)/2}" rpy="0 0 0"/>
-        <axis xyz="0 0 1"/>
-        <limit effort="1" lower="-${pi/4}" upper="${pi/4}" velocity="1"/>
-        <dynamics damping="0.2" friction="0"/> 
+        <origin xyz="${-0.257/2} -0.035  ${-(lz+bhz)/2}" rpy="0 0 0"/>
     </joint>
-
     <xacro:barra_horizontal p_name="barra_horizontal_ti_link" p_x="${bhx}" p_y="${bhy}" p_z="${bhz}" origin="${-0.0175}"/>
 
     <joint name="leftb_wheel_joint" type="continuous">
@@ -219,53 +202,60 @@
         <axis xyz="0 0 1"/>    
         <dynamics damping="0.2" friction="0.0"/>
     </joint>
-
     <xacro:wheel_macro p_name="leftb_wheel" p_radius="${rad_w}" p_width="${le_w}"/>
 
-    <!--Barra delantera derecha-->
-    <joint name="chassis_horizontalbar_3" type="revolute">
+
+    <joint name="chassis_horizontalbar_fr" type="fixed">
         <parent link="chassis"/>
         <child link="barra_horizontal_fr_link"/>
-        <origin xyz="${-0.257/2} 0.035  ${-(lz+bhz)/2}" rpy="0 0 0"/>
-        <axis xyz="0 0 1"/>
-        <limit effort="1" lower="-${pi/4}" upper="${pi/4}" velocity="1"/>
-        <dynamics damping="0.2" friction="0"/> 
+        <origin xyz="${0.257/2} 0.035  ${-(lz+bhz)/2}" rpy="0 0 0"/>
     </joint>
-
     <xacro:barra_horizontal p_name="barra_horizontal_fr_link" p_x="${bhx}" p_y="${bhy}" p_z="${bhz}" origin="${0.0175}"/>
 
-    <joint name="rightf_wheel_joint" type="continuous">
+    <xacro:phantom_steer_link p_name="right_steering_link"/>
+    <joint name="right_steering_joint" type="revolute">
         <parent link="barra_horizontal_fr_link"/>
+        <child link="right_steering_link"/>
+        <origin xyz="0 ${0.055+le_w/2} 0" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="5.0" lower="-${pi/4}" upper="${pi/4}" velocity="5.0"/>
+        <dynamics damping="0.2" friction="0.1"/> 
+    </joint>
+
+    <joint name="rightf_wheel_joint" type="continuous">
+        <parent link="right_steering_link"/>
         <child link="rightf_wheel"/>
-        <origin xyz="0 ${0.055+le_w/2} 0" rpy="-${pi/2} 0 0"/>
+        <origin xyz="0 0 0" rpy="-${pi/2} 0 0"/>
         <axis xyz="0 0 1"/>    
         <dynamics damping="0.2" friction="0.0"/>
     </joint>
-
     <xacro:wheel_macro p_name="rightf_wheel" p_radius="${rad_w}" p_width="${le_w}"/>
 
-    <!--Barra delantera izquierda-->
 
-    <joint name="chassis_horizontalbar_4" type="revolute">
+    <joint name="chassis_horizontalbar_fi" type="fixed">
         <parent link="chassis"/>
         <child link="barra_horizontal_fi_link"/>
-        <origin xyz="${-0.257/2} -0.035  ${-(lz+bhz)/2}" rpy="0 0 0"/>
-        <axis xyz="0 0 1"/>
-        <limit effort="1" lower="-${pi/4}" upper="${pi/4}" velocity="1"/>
-        <dynamics damping="0.2" friction="0"/> 
+        <origin xyz="${0.257/2} -0.035  ${-(lz+bhz)/2}" rpy="0 0 0"/>
     </joint>
-
     <xacro:barra_horizontal p_name="barra_horizontal_fi_link" p_x="${bhx}" p_y="${bhy}" p_z="${bhz}" origin="${-0.0175}"/>
 
-    <joint name="leftf_wheel_joint" type="continuous">
+    <xacro:phantom_steer_link p_name="left_steering_link"/>
+    <joint name="left_steering_joint" type="revolute">
         <parent link="barra_horizontal_fi_link"/>
+        <child link="left_steering_link"/>
+        <origin xyz="0 ${-(0.055+le_w/2)} 0" rpy="0 0 0"/>
+        <axis xyz="0 0 1"/>
+        <limit effort="5.0" lower="-${pi/4}" upper="${pi/4}" velocity="5.0"/>
+        <dynamics damping="0.2" friction="0.1"/> 
+    </joint>
+
+    <joint name="leftf_wheel_joint" type="continuous">
+        <parent link="left_steering_link"/>
         <child link="leftf_wheel"/>
-        <origin xyz="0 ${-(0.055+le_w/2)} 0" rpy="-${pi/2} 0 0"/>
+        <origin xyz="0 0 0" rpy="-${pi/2} 0 0"/>
         <axis xyz="0 0 1"/>    
         <dynamics damping="0.2" friction="0.0"/>
     </joint>
-
     <xacro:wheel_macro p_name="leftf_wheel" p_radius="${rad_w}" p_width="${le_w}"/>
-
 
 </robot>

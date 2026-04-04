@@ -71,7 +71,7 @@ def generate_launch_description():
         arguments=[
             "-name", "ackermann_bot",
             "-topic", "robot_description",
-            "-x", "0.0", "-y", "0.0", "-z", "2.0",
+            "-x", "-7.0", "-y", "-3.0", "-z", "2.0", "-Y", "-1.57"
         ],
     )
 
@@ -199,5 +199,5 @@ def generate_launch_description():
         # keyboard_teleop_node,
         twist_mux_node,
         aebs_launch,
-        ekf_launch,
+        # ekf_launch,
     ])
