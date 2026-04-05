@@ -49,8 +49,11 @@ class DistFinder(Node):
     def callback(self, msg):
         # 1. Perception: Check surroundings
         total = len(msg.ranges)
-        left_sector = np.array(msg.ranges[int(total*0.7):int(total*0.9)]) # Adjusted indices
-        right_sector = np.array(msg.ranges[int(total*0.1):int(total*0.3)])
+        # left_sector = np.array(msg.ranges[int(total*0.7):int(total*0.9)]) # Adjusted indices
+        # right_sector = np.array(msg.ranges[int(total*0.1):int(total*0.3)])
+
+        right_sector = np.array(msg.ranges[int(total*0.7):int(total*0.9)])
+        left_sector  = np.array(msg.ranges[int(total*0.1):int(total*0.3)])
         
         # Filter valid points
         left_valid = left_sector[np.isfinite(left_sector)]
@@ -82,7 +85,11 @@ class DistFinder(Node):
 
         self.ray_b_angle = self.desired_wall_side * np.pi/2    
 
-        front_sector = np.array(msg.ranges[int(total*0.45):int(total*0.55)])
+        # front_sector = np.array(msg.ranges[int(total*0.45):int(total*0.55)])
+        front_sector = np.array(
+            list(msg.ranges[0:int(total*0.05)]) +
+            list(msg.ranges[int(total*0.95):])
+        )
         front_valid = front_sector[np.isfinite(front_sector)]
         front_min = np.min(front_valid) if len(front_valid) > 0 else 5.0
         
@@ -117,18 +124,34 @@ class DistFinder(Node):
         self.error_publisher.publish(error_msg)
         self.publish_debug_rays(b, a, msg.header)
 
+
+    def normalize_angle(self, angle):
+        while angle > np.pi:
+            angle -= 2 * np.pi
+        while angle < -np.pi:
+            angle += 2 * np.pi
+        return angle
+
     def getRange(self, msg):
         # Rayo B: A 90 grados
-        ray_b_angle = self.ray_b_angle
-        
+        LIDAR_OFFSET = np.radians(180)  # Ajusta según tu montaje: 90, 180, -90...
+        #ray_b_angle = self.ray_b_angle + LIDAR_OFFSET
         # Si pared izquierda (90): A = 90 - 45 = 45 (adelante-izq)
         # Si pared derecha (-90): A = -90 - (-45) = -45 (adelante-der)
-        ray_a_angle = ray_b_angle - (self.theta * self.desired_wall_side)
+        #ray_a_angle = ray_b_angle - (self.theta * self.desired_wall_side)+LIDAR_OFFSET
+
+        # ray_b_angle = self.ray_b_angle + LIDAR_OFFSET
+        # ray_a_angle = self.ray_b_angle - (self.theta * self.desired_wall_side) + LIDAR_OFFSET
+
+        ray_b_angle = self.normalize_angle(self.ray_b_angle + LIDAR_OFFSET)
+        ray_a_angle = self.normalize_angle(self.ray_b_angle - (self.theta * self.desired_wall_side) + LIDAR_OFFSET)
 
         # Convertir ángulos a índices del array
         # Formula: index = (angle - min_angle) / increment
-        ray_b_index = int((ray_b_angle - msg.angle_min) / msg.angle_increment)
-        ray_a_index = int((ray_a_angle - msg.angle_min) / msg.angle_increment)
+        # ray_b_index = int((ray_b_angle - msg.angle_min) / msg.angle_increment)
+        # ray_a_index = int((ray_a_angle - msg.angle_min) / msg.angle_increment)
+        ray_b_index = int(round((ray_b_angle - msg.angle_min) / msg.angle_increment))
+        ray_a_index = int(round((ray_a_angle - msg.angle_min) / msg.angle_increment))
 
         # Protección de índices (por si se salen del array 0-360)
         num_readings = len(msg.ranges)

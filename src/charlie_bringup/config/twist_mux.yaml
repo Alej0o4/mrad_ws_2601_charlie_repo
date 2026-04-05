@@ -18,4 +18,4 @@ twist_mux:
       wall_following:
         topic   : cmd_vel_ctrl
         timeout : 0.5
-        priority: 75
+        priority: 110
