@@ -1,0 +1,31 @@
+{
+    "name": "Charlie ROS 2 Jazzy",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+        "--ipc=host",
+        "--network=host",
+        "--privileged"
+    ],
+    "containerEnv": {
+        "DISPLAY": "host.docker.internal:0.0"
+    },
+    "workspaceFolder": "/workspace",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/bin/python3",
+                "terminal.integrated.defaultProfile.linux": "bash"
+            },
+            "extensions": [
+                "mhutchie.git-graph",
+                "ms-python.python",
+                "ms-vscode.cpptools",
+                "ms-iot.vscode-ros"
+            ]
+        }
+    },
+    "remoteUser": "root"
+}

@@ -76,7 +76,7 @@
         <collision name='maze_collision'>
           <geometry>
             <mesh>
-              <uri>/home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/models/RaceTrack.stl</uri>
+              <uri>/workspace/src/charlie_gazebo/models/RaceTrack.stl</uri>
               <scale>10 10 10</scale>
             </mesh>
           </geometry>
@@ -91,7 +91,7 @@
         <visual name='visual'>
           <geometry>
             <mesh>
-              <uri>/home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/models/RaceTrack.stl</uri>
+              <uri>/workspace/src/charlie_gazebo/models/RaceTrack.stl</uri>
               <scale>10 10 10</scale>
             </mesh>
           </geometry>

@@ -31,7 +31,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration("use_sim_time")
    
-    ekf_params = os.path.join(get_package_share_directory(ekf_pkg_name),'config','ekf_params.yaml')
+    ekf_params = os.path.join(get_package_share_directory(ekf_pkg_name),'config','ekf.yaml')
 
     imu_stamper_node = Node(
         package="charlie_ekf",
