@@ -191,8 +191,9 @@ class DistFinder(Node):
         # X = dist * cos(theta), Y = dist * sin(theta)
         
         # Ángulos actuales (Recalculamos lo mismo que en getRange para dibujar)
-        angle_b = self.ray_b_angle
-        angle_a = angle_b - (self.theta * self.desired_wall_side)
+        LIDAR_OFFSET = np.pi
+        angle_b = self.normalize_angle(self.ray_b_angle + LIDAR_OFFSET)
+        angle_a = self.normalize_angle(self.ray_b_angle - (self.theta * self.desired_wall_side) + LIDAR_OFFSET)
 
         # Punto B (Final del rayo)
         pb_x = dist_b * np.cos(angle_b)
