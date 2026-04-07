@@ -15,3 +15,4 @@ __pycache__/
 
 # Archivos de sistema
 .DS_Store
+.venv_sysid/
