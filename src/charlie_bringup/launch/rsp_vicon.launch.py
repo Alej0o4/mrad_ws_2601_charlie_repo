@@ -63,7 +63,7 @@ def generate_launch_description():
     
     twist_mux_node = Node(package='twist_mux', 
                     executable='twist_mux',
-                    parameters=[twist_mux_params,{'use_sim_time': True}],
+                    parameters=[twist_mux_params,{'use_sim_time': False}],
                     remappings=[('/cmd_vel_out','/cmd_vel_raw')]
     )
 
@@ -71,6 +71,14 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory(aebs_pkg_name), 'launch', 'aebs.launch.py')
         )
+    )
+
+    # Se suscribe a /scan_raw y publica en /scan
+    lidar_node = Node(
+        package='charlie_bringup',
+        executable='scan_inverter_node', # El nombre que pusiste en setup.py
+        name='scan_inverter',
+        output='screen'
     )
 
     return LaunchDescription(
@@ -85,6 +93,7 @@ def generate_launch_description():
             joy_node,
             teleop_node,
             twist_mux_node,
+            lidar_node,
             # aebs_launch
         ]
     )

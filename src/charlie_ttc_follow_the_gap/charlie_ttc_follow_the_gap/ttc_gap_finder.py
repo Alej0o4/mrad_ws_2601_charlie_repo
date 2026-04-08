@@ -35,7 +35,7 @@ class TtcGapFinder(Node):
         qos_reliable = QoSProfile(depth=10)
 
         # Suscripciones
-        self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_sensor)
+        self.scan_sub = self.create_subscription(LaserScan, '/scan_filtered', self.scan_callback, qos_sensor)
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, qos_reliable)
 
         # Publicación Principal

@@ -11,5 +11,5 @@ ttc_gap_finder:
 ttc_control:
   ros__parameters:
     kp: 3.5                # Ganancia Proporcional. Alto = Giro rápido hacia el hueco
-    max_speed: 1.3        # m/s. Velocidad máxima en rectas (¡A correr!)
+    max_speed: 0.5        # m/s. Velocidad máxima en rectas (¡A correr!)
     max_steering: 1.57       # Radianes. Límite físico de tus ruedas

@@ -30,6 +30,7 @@ setup(
         'console_scripts': [
             'path_recorder = charlie_bringup.path_recorder:main',
             'vicon_to_odom_node = charlie_bringup.pose2odom_node:main',
+            'scan_inverter_node = charlie_bringup.lidar_node:main',
         ],
     },
 )

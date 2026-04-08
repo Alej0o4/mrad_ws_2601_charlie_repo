@@ -59,7 +59,7 @@ class AEBSNode(Node):
 
         # --- SUSCRIPCIONES ---
         self.cmd_sub = self.create_subscription(TwistStamped, '/cmd_vel_raw', self.cmd_callback, 10)
-        self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_sensor)
+        self.scan_sub = self.create_subscription(LaserScan, '/scan_filtered', self.scan_callback, qos_sensor)
 
         # --- PUBLICACIÓN ---
         self.cmd_pub = self.create_publisher(TwistStamped, '/diffdrive_controller/cmd_vel', 10)

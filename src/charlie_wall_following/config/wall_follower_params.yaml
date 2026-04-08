@@ -12,7 +12,7 @@ dist_finder:
 # Parámetros para el Nodo de Control (PID)
 control:
   ros__parameters:
-    kp: 1.1                     # Ganancia Proporcional (Fuerza de giro)
+    kp: 1.8                     # Ganancia Proporcional (Fuerza de giro)
     kd: 0.6                     # Ganancia Derivativa (Amortiguación)
     max_speed: 0.5            # Velocidad máxima en rectas (m/s)
-    max_steering: 0.5           # Límite físico de las llantas (rad)
+    max_steering: 1.5           # Límite físico de las llantas (rad)
