@@ -1,15 +1,15 @@
 # Parámetros para el Buscador de Huecos (Percepción)
 ttc_gap_finder:
   ros__parameters:
-    robot_width: 0.44       # Ancho real del robot en metros
-    ttc_min: 10.2          # Segundos. Si TTC < 0.6, se considera muro
-    fov_angle: 1.292  # Campo de visión útil (1.57 rad = 90 grados a cada lado)
-    safety_margin: 0.09    # Metros extra alrededor de obstáculos (Inflado de burbuja)
+    robot_width: 0.30       # Ancho real del robot en metros
+    ttc_min: 0.8          # Segundos. Si TTC < 1.3, se considera muro
+    fov_angle: 1.14  # Campo de visión útil (1.57 rad = 90 grados a cada lado)
+    safety_margin: 0.08   # Metros extra alrededor de obstáculos (Inflado de burbuja)
     debug_mode: True        # Si es True, se publican tópicos de depuración
 
 # Parámetros para el Controlador (Acción)
 ttc_control:
   ros__parameters:
-    kp: 3.5                # Ganancia Proporcional. Alto = Giro rápido hacia el hueco
-    max_speed: 1.3        # m/s. Velocidad máxima en rectas (¡A correr!)
-    max_steering: 1.57       # Radianes. Límite físico de tus ruedas
+    kp: 3.5               # Ganancia Proporcional. Alto = Giro rápido hacia el hueco
+    max_speed: 2.0        # m/s. Velocidad máxima en rectas (¡A correr!)
+    max_steering: 1.5     # Radianes. Límite físico de tus ruedas

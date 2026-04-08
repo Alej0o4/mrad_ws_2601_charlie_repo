@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import TwistStamped 
 from nav_msgs.msg import Odometry 
-from visualization_msgs.msg import Marker, MarkerArray # <--- NUEVO
+from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
 from geometry_msgs.msg import Point
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
@@ -13,11 +14,11 @@ class TtcGapFinder(Node):
     def __init__(self):
         super().__init__('ttc_gap_finder')
 
-        # --- PARÁMETROS ---
+        # --- PARÁMETROS (Ajustados para Robot Diferencial) ---
         self.declare_parameter('robot_width', 0.44)
-        self.declare_parameter('ttc_min', 0.7)
-        self.declare_parameter('fov_angle', np.radians(90))
-        self.declare_parameter('safety_margin', 0.15) 
+        self.declare_parameter('ttc_min', 0.8)         # ¡Corregido! 
+        self.declare_parameter('fov_angle', 1.57)      # 90 grados a cada lado (Sin puntos ciegos)
+        self.declare_parameter('safety_margin', 0.15)  # Margen seguro base
         self.declare_parameter('debug_mode', True) 
 
         # Leer valores
@@ -43,13 +44,10 @@ class TtcGapFinder(Node):
 
         # --- PUBLICADORES DE DEBUG ---
         if self.debug_mode:
-            # Publica el scan modificado (con burbujas y recortes)
             self.proc_scan_pub = self.create_publisher(LaserScan, '/proc_scan', qos_reliable)
-            # Publica flechas y lineas
             self.marker_pub = self.create_publisher(MarkerArray, '/debug_markers', qos_reliable)
 
-        self.get_logger().info(f"TTC Gap Finder Ready. Debug Mode: {self.debug_mode}")
-        self.get_logger().info(f"Parameters: FOV={np.degrees(self.fov_angle):.1f}°, Robot Width={self.width:.2f}m, TTC Min={self.ttc_min:.2f}s, Safety Margin={self.safety_margin:.2f}m")
+        self.get_logger().info(f"TTC Gap Finder (Ultimate Edition) Ready. Debug Mode: {self.debug_mode}")
 
     def odom_callback(self, msg):
         self.current_speed = msg.twist.twist.linear.x
@@ -64,8 +62,6 @@ class TtcGapFinder(Node):
 
         # 2. Recorte FOV
         fov_mask = np.abs(self.angles) <= self.fov_angle
-        
-        # IMPORTANTE: Trabajamos con copias para poder publicar el scan modificado luego
         proc_ranges = ranges[fov_mask].copy() 
         proc_angles = self.angles[fov_mask].copy()
 
@@ -77,62 +73,72 @@ class TtcGapFinder(Node):
             unsafe_mask = ttc < self.ttc_min
             proc_ranges[unsafe_mask] = 0.0
         
-        # 4. Burbuja de Seguridad
-        # valid_indices = np.where(proc_ranges > 0.05)[0]
-        # if len(valid_indices) > 0:
-        #     min_dist_idx = valid_indices[np.argmin(proc_ranges[valid_indices])]
-        #     min_dist = proc_ranges[min_dist_idx]
-            
-        #     safety_radius = (self.width / 2.0) + self.safety_margin 
-        #     bubble_angle = np.arctan2(safety_radius, min_dist)
-        #     angle_inc = msg.angle_increment
-        #     bubble_indices = int(bubble_angle / angle_inc)
-            
-        #     start = max(0, min_dist_idx - bubble_indices)
-        #     end = min(len(proc_ranges), min_dist_idx + bubble_indices)
-        #     proc_ranges[start:end] = 0.0
-        
+        # 4. Burbuja de Seguridad Dinámica (¡Corregida!)
         valid_indices = np.where(proc_ranges > 0.05)[0]
         
         if len(valid_indices) > 0:
-            # Encontramos el punto más cercano (el obstáculo más peligroso)
             min_dist_idx = valid_indices[np.argmin(proc_ranges[valid_indices])]
             min_dist = proc_ranges[min_dist_idx]
             
-            # --- LÓGICA DINÁMICA ---
-            # Si el robot está en espacio abierto (> 1m), usa el margen completo.
-            # Si entra en la zona estrecha (< 1m), reduce el margen proporcionalmente.
-            # Esto evita que la burbuja sea tan grande que tape el único hueco disponible.
-            
             if min_dist < 0.5:
-                # Escalamos el margen: A 0.5m de dist, usa el 50% del margen.
-                # Mantenemos un mínimo de 0.02m para no chocar.
-                dynamic_margin = max(0.3, self.safety_margin * (min_dist / 1.0))
+                # Límite mínimo duro de 3cm para no apagar el hueco
+                dynamic_margin = max(0.03, self.safety_margin * (min_dist / 0.5))
             else:
-                # Espacio abierto: usamos el margen seguro completo
                 dynamic_margin = self.safety_margin
 
-            # Calculamos el radio total (Mitad del robot + margen calculado)
             safety_radius = (self.width / 2.0) + dynamic_margin 
-            
-            # Calculamos cuántos índices del array representa ese radio (Geometría básica)
             bubble_angle = np.arctan2(safety_radius, min_dist)
             angle_inc = msg.angle_increment
             bubble_indices = int(bubble_angle / angle_inc)
             
-            # Aplicamos la burbuja (Ponemos a 0 esos rangos)
             start = max(0, min_dist_idx - bubble_indices)
             end = min(len(proc_ranges), min_dist_idx + bubble_indices)
             proc_ranges[start:end] = 0.0
 
-        # 5. Encontrar Gap
-        gap_start, gap_end = self.find_max_gap(proc_ranges)
+        # 5. Encontrar el MEJOR Gap (Combinación de Ancho y Profundo)
+        gap_start, gap_end = self.find_best_gap(proc_ranges)
         
-        # 6. Calcular Objetivo
-        best_idx = (gap_start + (gap_end-1)) // 2
+        # ---------------------------------------------------------
+        # 6. CALCULAR OBJETIVO (Afinado para Ackermann)
+        # ---------------------------------------------------------
+        gap_center = (gap_start + (gap_end - 1)) // 2
+        gap_width = gap_end - gap_start
+        
+        best_idx = gap_center
+        best_score = -1.0
+
+        for i in range(gap_start, gap_end):
+            # Saturamos a 4.0m (Ackermann necesita mirar un poco más lejos que un diferencial)
+            depth = min(proc_ranges[i], 4.0)
+            
+            # Distancia normalizada
+            dist_from_center = abs(i - gap_center) / (gap_width / 2.0 + 1e-5)
+            
+            # Penalización LATERAL reducida dramáticamente (del 70% al 15%)
+            # Permite al Ackermann comprometerse a giros cerrados sin "arrepentirse" y oscilar
+            score = depth * (1.0 - 0.35 * dist_from_center)
+            
+            if score > best_score:
+                best_score = score
+                best_idx = i
+                
         steering_angle = proc_angles[best_idx]
 
-        # 7. Publicar
+        # ---------------------------------------------------------
+        # 7. INSTINTO DE SUPERVIVENCIA LATERAL (Repulsión)
+        # ---------------------------------------------------------
+        # Promedio de los 10 rayos más a la derecha y a la izquierda
+        right_clearance = np.mean(proc_ranges[:10]) 
+        left_clearance = np.mean(proc_ranges[-10:]) 
+        
+        # Si gira hacia la izquierda pero roza a la derecha
+        if steering_angle > 0 and right_clearance < 0.4:
+            steering_angle *= 1.5
+        # Si gira hacia la derecha pero roza a la izquierda
+        elif steering_angle < 0 and left_clearance < 0.4:
+            steering_angle *= 1.5
+
+        # 8. Publicar
         out_msg = TwistStamped()
         out_msg.header = msg.header
         out_msg.twist.angular.z = float(steering_angle)
@@ -144,29 +150,42 @@ class TtcGapFinder(Node):
             safe_end_idx = max(0, gap_end - 1)
             self.publish_debug_markers(steering_angle, proc_angles[gap_start], proc_angles[safe_end_idx], msg.header)
 
-    def find_max_gap(self, ranges):
+    # --- LA NUEVA FUNCIÓN DE BÚSQUEDA ---
+    def find_best_gap(self, ranges):
         mask = ranges > 0.05
         padded_mask = np.concatenate(([False], mask, [False]))
         diff = np.diff(padded_mask.astype(int))
         starts = np.where(diff == 1)[0]
         ends = np.where(diff == -1)[0]
+        
         if len(starts) == 0: return 0, len(ranges)-1
-        lengths = ends - starts
-        max_idx = np.argmax(lengths)
-        return starts[max_idx], ends[max_idx]
+        
+        best_score = -1.0
+        best_start = 0
+        best_end = len(ranges)-1
+        
+        for s, e in zip(starts, ends):
+            gap_width = e - s
+            if gap_width < 5:  # Ignorar ruido
+                continue
+                
+            gap_ranges = ranges[s:e]
+            avg_depth = np.mean(gap_ranges)
+            
+            # Fusión: 40% ancho, 60% profundidad
+            score = (gap_width * 0.7) + (avg_depth * 2.0)
+            
+            if score > best_score:
+                best_score = score
+                best_start = s
+                best_end = e
+                
+        return best_start, best_end
 
     # --- FUNCIONES DE DEBUG ---
-
     def publish_debug_scan(self, proc_ranges, original_msg):
-        """
-        Publica un LaserScan falso que muestra lo que ve el algoritmo (Burbujas = 0)
-        """
         debug_msg = LaserScan()
         debug_msg.header = original_msg.header
-        
-        # Ajustamos los parámetros del scan porque recortamos el FOV
-        # El ángulo mínimo ahora es el primero de nuestro array recortado (-90)
-        # Nota: Esto asume simetría en el recorte
         debug_msg.angle_min = -self.fov_angle 
         debug_msg.angle_max = self.fov_angle
         debug_msg.angle_increment = original_msg.angle_increment
@@ -174,35 +193,27 @@ class TtcGapFinder(Node):
         debug_msg.scan_time = original_msg.scan_time
         debug_msg.range_min = original_msg.range_min
         debug_msg.range_max = original_msg.range_max
-        
         debug_msg.ranges = proc_ranges.tolist()
         self.proc_scan_pub.publish(debug_msg)
 
     def publish_debug_markers(self, target_angle, gap_start_angle, gap_end_angle, header):
         marker_array = MarkerArray()
         
-        # Marcador 1: Flecha de Dirección (Verde)
         arrow = Marker()
         arrow.header = header
         arrow.ns = "steering_goal"
         arrow.id = 0
         arrow.type = Marker.ARROW
         arrow.action = Marker.ADD
-        arrow.scale.x = 0.05 # Grosor flecha
-        arrow.scale.y = 0.1 # Ancho cabeza
+        arrow.scale.x = 0.05
+        arrow.scale.y = 0.1
         arrow.scale.z = 0.1
-        arrow.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0) # Verde
+        arrow.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)
         
-        # Puntos de la flecha (Origen -> Destino)
         start_pt = Point(x=0.0, y=0.0, z=0.0)
-        end_pt = Point(
-            x=2.0 * np.cos(target_angle), # Longitud fija 2m para que se vea bien
-            y=2.0 * np.sin(target_angle), 
-            z=0.0
-        )
+        end_pt = Point(x=2.0 * np.cos(target_angle), y=2.0 * np.sin(target_angle), z=0.0)
         arrow.points = [start_pt, end_pt]
         
-        # Marcador 2: Límites del Gap (Líneas Rojas)
         gap_lines = Marker()
         gap_lines.header = header
         gap_lines.ns = "gap_boundaries"
@@ -210,11 +221,9 @@ class TtcGapFinder(Node):
         gap_lines.type = Marker.LINE_LIST
         gap_lines.action = Marker.ADD
         gap_lines.scale.x = 0.01
-        gap_lines.color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0) # Rojo
+        gap_lines.color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0)
         
-        # Linea Inicio Gap
         p1 = Point(x=3.0 * np.cos(gap_start_angle), y=3.0 * np.sin(gap_start_angle), z=0.0)
-        # Linea Fin Gap
         p2 = Point(x=3.0 * np.cos(gap_end_angle), y=3.0 * np.sin(gap_end_angle), z=0.0)
         
         gap_lines.points = [start_pt, p1, start_pt, p2]
@@ -228,3 +237,6 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
+if __name__ == "__main__":
+    main()

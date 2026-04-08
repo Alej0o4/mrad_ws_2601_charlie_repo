@@ -71,7 +71,8 @@ def generate_launch_description():
         arguments=[
             "-name", "ackermann_bot",
             "-topic", "robot_description",
-            "-x", "-7.0", "-y", "-3.0", "-z", "2.0", "-Y", "-1.57"
+            #"-x", "-0.0", "-y", "-0.0", "-z", "2.0", "-Y", "-1.57"
+            "-x", "-18.0", "-y", "4.0", "-z", "0.2", "-Y", "1.57"
         ],
     )
 

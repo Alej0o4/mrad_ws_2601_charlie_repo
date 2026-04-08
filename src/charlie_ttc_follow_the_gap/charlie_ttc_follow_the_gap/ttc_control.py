@@ -3,18 +3,16 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from geometry_msgs.msg import TwistStamped
+import numpy as np
 
 class TtcControl(Node): 
     def __init__(self):
         super().__init__("ttc_control") 
 
         # --- PARÁMETROS ---
-        # Kp: Convierte grados de error en velocidad de giro (rad/s)
-        self.declare_parameter('kp', 1.5)  
-        # Velocidad máxima en recta (m/s) - ¡Sube esto si quieres ganar la carrera!
-        self.declare_parameter('max_speed', 1.5) 
-        # Límite físico de giro del robot (rad/s)
-        self.declare_parameter('max_steering', 1.0)
+        self.declare_parameter('kp', 2.5)  
+        self.declare_parameter('max_speed', 2.0)  # Recomendado: 1.8 a 2.5 para diferencial
+        self.declare_parameter('max_steering', 1.57)
 
         self.last_target_angle = 0.0
 
@@ -27,7 +25,6 @@ class TtcControl(Node):
         qos_profile = QoSProfile(depth=10)
 
         # 1. SUBSCRIBER
-        # Escuchamos el ángulo que calculó el nodo 'ttc_gap_finder'
         self.angle_sub = self.create_subscription(
             TwistStamped, 
             '/gap_angle', 
@@ -36,51 +33,57 @@ class TtcControl(Node):
         )
 
         # 2. PUBLISHER
-        # Publicamos el comando final hacia el Mux o el Robot
         self.vel_publisher = self.create_publisher(TwistStamped, '/cmd_vel_ctrl', qos_profile)
 
-        self.get_logger().info("TTC Control Node Initialized")
+        self.get_logger().info("TTC Control Node Initialized - Ultimate Racing Mode")
     
     def callback(self, msg):
-        # msg viene del gap_finder. 
-        # msg.twist.angular.z contiene el ángulo hacia el centro del hueco (gap).
-        
-        #target_angle = msg.twist.angular.z
         raw_angle = msg.twist.angular.z
 
-        # --- [MEJORA] FILTRO DE SUAVIZADO (Exponential Moving Average) ---
-        # alpha controla la suavidad:
-        # 1.0 = Sin suavizado (reacción instantánea, mucha oscilación)
-        # 0.1 = Muy suave (reacción lenta, como un barco)
-        # 0.6 es un buen equilibrio para Racing: reacciona rápido pero filtra el ruido.
-        alpha = 0.4
-        
+        # Filtro de suavizado (Mantenido)
+        alpha = 0.85
         target_angle = (alpha * raw_angle) + ((1.0 - alpha) * self.last_target_angle)
-        self.last_target_angle = target_angle # Guardamos para la siguiente vez
+        self.last_target_angle = target_angle 
 
-        # --- LEY DE CONTROL DE DIRECCIÓN (STEERING) ---
-        # Como el robot mira a 0, el error es: Deseado - Actual(0) = target_angle
-        # Aplicamos control Proporcional
+        # --- LEY DE CONTROL (Generación de Omega) ---
+        # El target_angle (error angular hacia el hueco) se multiplica por Kp
+        # para generar una VELOCIDAD ANGULAR (rad/s), no una posición de llanta.
+        # El twist_cmd_node de abajo se encargará de convertir esta Omega al Delta físico.
         angular_cmd = self.kp * target_angle
 
-        # Saturación (Clamping)
-        # Evitamos mandar comandos que el robot no puede ejecutar físicamente
+        # Opcional: Podrías saturar la Omega aquí, pero el twist_cmd_node ya protegerá
+        # la llanta físicamente, así que es redundante. Se mantiene por seguridad en simulación.
         angular_cmd = max(min(angular_cmd, self.max_steering), -self.max_steering)
 
-        # --- LEY DE CONTROL DE VELOCIDAD (THROTTLE) ---
-        # Estrategia de Racing:
-        # - Recta (ángulo 0) -> Velocidad Máxima
-        # - Curva cerrada (ángulo alto) -> Velocidad Mínima
-        # Fórmula: V = V_max / (1 + abs(giro) * factor)
-        linear_cmd = self.max_speed / (1.0 + abs(angular_cmd))
+        # ---------------------------------------------------------
+        # LEY DE VELOCIDAD EXPONENCIAL (GAUSSIANA)
+        # ---------------------------------------------------------
+        min_survival_speed = 0.5 # Velocidad base para que la dirección funcione
+        k_factor = 0.6           # Qué tan agresivo es el frenado (Tuning param)
+        
+        # El decaimiento es 1.0 (100%) cuando angular_cmd es 0, y tiende a 0.0 en giros fuertes
+        decay = np.exp(-k_factor * (angular_cmd ** 2))
+        
+        # Rango de velocidad disponible para jugar
+        speed_range = self.max_speed - min_survival_speed
+        
+        # Velocidad final: El mínimo vital + el rango extra multiplicado por el decaimiento
+        linear_cmd = min_survival_speed + (speed_range * decay)
+
+        # --- LEY DE VELOCIDAD ADAPTATIVA (Seguridad Ackermann) ---
+        # Frenamos fuertemente en las curvas para evitar el derrape
+        #min_survival_speed = 0.3 # El carro debe avanzar para poder rotar
+        
+        # ratio de qué tan "fuerte" estamos pidiendo girar respecto a lo que puede el carro
+        #steering_ratio = abs(angular_cmd) / self.max_steering
+        
+        # Caída drástica en curvas cerradas (hasta el min_survival_speed)
+        #linear_cmd = self.max_speed * (1.0 - (0.8 * steering_ratio))
+        #linear_cmd = max(linear_cmd, min_survival_speed)
 
         # --- PUBLICACIÓN ---
         out_msg = TwistStamped()
-        
-        # CRÍTICO: Copiar el header para mantener la sincronización de tiempo
-        # Si el gap_finder detectó el hueco en T=100, este comando es para T=100.
         out_msg.header = msg.header
-        
         out_msg.twist.linear.x = float(linear_cmd)
         out_msg.twist.angular.z = float(angular_cmd)
         
