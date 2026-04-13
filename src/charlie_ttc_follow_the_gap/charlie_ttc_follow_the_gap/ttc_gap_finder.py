@@ -60,16 +60,19 @@ class TtcGapFinder(Node):
         if self.angles is None or len(self.angles) != len(ranges):
             self.angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges))
             
-        ranges = np.nan_to_num(ranges, posinf=msg.range_max)
+        # 1. MANEJO DE INFINITOS Y HORIZONTE
+        # En lugar de dejar que los infinitos lleguen a range_max (ej. 12m), los limitamos 
+        # a un horizonte táctico (ej. 4.0m). Así el robot se enfoca en el camino inmediato.
+        horizon_dist = 4.0
+        ranges = np.nan_to_num(ranges, posinf=horizon_dist, neginf=0.0)
+        ranges = np.clip(ranges, 0.0, horizon_dist)
 
         # 2. Recorte FOV
         fov_mask = np.abs(self.angles) <= self.fov_angle
-        
-        # IMPORTANTE: Trabajamos con copias para poder publicar el scan modificado luego
         proc_ranges = ranges[fov_mask].copy() 
         proc_angles = self.angles[fov_mask].copy()
 
-        # 3. Filtro TTC
+        # 3. Filtro TTC (Se mantiene igual)
         if self.current_speed > 0.1:
             closing_speeds = self.current_speed * np.cos(proc_angles)
             closing_speeds[closing_speeds <= 0] = 0.001
@@ -77,59 +80,67 @@ class TtcGapFinder(Node):
             unsafe_mask = ttc < self.ttc_min
             proc_ranges[unsafe_mask] = 0.0
         
-        # 4. Burbuja de Seguridad
-        # valid_indices = np.where(proc_ranges > 0.05)[0]
-        # if len(valid_indices) > 0:
-        #     min_dist_idx = valid_indices[np.argmin(proc_ranges[valid_indices])]
-        #     min_dist = proc_ranges[min_dist_idx]
-            
-        #     safety_radius = (self.width / 2.0) + self.safety_margin 
-        #     bubble_angle = np.arctan2(safety_radius, min_dist)
-        #     angle_inc = msg.angle_increment
-        #     bubble_indices = int(bubble_angle / angle_inc)
-            
-        #     start = max(0, min_dist_idx - bubble_indices)
-        #     end = min(len(proc_ranges), min_dist_idx + bubble_indices)
-        #     proc_ranges[start:end] = 0.0
+        # 4. DISPARITY EXTENDER (El reemplazo de la burbuja única)
+        threshold = 0.2  # Una diferencia de 20cm entre rayos es un "borde" de obstáculo
+        diffs = np.diff(proc_ranges)
+        disparity_indices = np.where(np.abs(diffs) > threshold)[0]
         
-        valid_indices = np.where(proc_ranges > 0.05)[0]
-        
-        if len(valid_indices) > 0:
-            # Encontramos el punto más cercano (el obstáculo más peligroso)
-            min_dist_idx = valid_indices[np.argmin(proc_ranges[valid_indices])]
-            min_dist = proc_ranges[min_dist_idx]
-            
-            # --- LÓGICA DINÁMICA ---
-            # Si el robot está en espacio abierto (> 1m), usa el margen completo.
-            # Si entra en la zona estrecha (< 1m), reduce el margen proporcionalmente.
-            # Esto evita que la burbuja sea tan grande que tape el único hueco disponible.
-            
-            if min_dist < 0.5:
-                # Escalamos el margen: A 0.5m de dist, usa el 50% del margen.
-                # Mantenemos un mínimo de 0.02m para no chocar.
-                dynamic_margin = max(0.3, self.safety_margin * (min_dist / 1.0))
+        for idx in disparity_indices:
+            # Determinamos cuál rayo es la pared y cuál es el hueco
+            if proc_ranges[idx] < proc_ranges[idx + 1]:
+                closer_idx = idx
+                farther_idx = idx + 1
             else:
-                # Espacio abierto: usamos el margen seguro completo
-                dynamic_margin = self.safety_margin
-
-            # Calculamos el radio total (Mitad del robot + margen calculado)
-            safety_radius = (self.width / 2.0) + dynamic_margin 
+                closer_idx = idx + 1
+                farther_idx = idx
+                
+            closer_dist = proc_ranges[closer_idx]
             
-            # Calculamos cuántos índices del array representa ese radio (Geometría básica)
-            bubble_angle = np.arctan2(safety_radius, min_dist)
+            # Si el obstáculo está muy cerca, hacemos el margen un poco más grande
+            margin = self.safety_margin
+            if closer_dist < 0.5:
+                margin *= 1.5 
+                
+            safety_radius = (self.width / 2.0) + margin 
+            
+            # Calculamos cuántos índices abarca este radio a esta distancia
+            bubble_angle = np.arctan2(safety_radius, closer_dist)
             angle_inc = msg.angle_increment
             bubble_indices = int(bubble_angle / angle_inc)
             
-            # Aplicamos la burbuja (Ponemos a 0 esos rangos)
-            start = max(0, min_dist_idx - bubble_indices)
-            end = min(len(proc_ranges), min_dist_idx + bubble_indices)
-            proc_ranges[start:end] = 0.0
+            # "Engordamos" el obstáculo sobrescribiendo el espacio vacío con la distancia corta
+            # Esto es mejor que poner 0.0, porque preserva la forma de la pared para el gap
+            if closer_idx == idx: # Borde a la izquierda, extendemos hacia la derecha
+                start = farther_idx
+                end = min(len(proc_ranges), farther_idx + bubble_indices)
+                proc_ranges[start:end] = closer_dist
+            else: # Borde a la derecha, extendemos hacia la izquierda
+                start = max(0, farther_idx - bubble_indices + 1)
+                end = farther_idx + 1
+                proc_ranges[start:end] = closer_dist
 
-        # 5. Encontrar Gap
+        # Opcional: Si el punto es MUY cercano (< 0.2m), lo forzamos a 0 para que sea "lava"
+        proc_ranges[proc_ranges < 0.2] = 0.0
+
+        # 5. Encontrar Gap (El hueco más ancho que queda después de inflar todo)
         gap_start, gap_end = self.find_max_gap(proc_ranges)
         
-        # 6. Calcular Objetivo
-        best_idx = (gap_start + (gap_end-1)) // 2
+        # 6. CALCULAR OBJETIVO (Basado en la máxima profundidad)
+        gap_ranges = proc_ranges[gap_start:gap_end]
+        
+        if len(gap_ranges) > 0:
+            max_depth = np.max(gap_ranges)
+            # Encontramos todos los índices que están casi a la profundidad máxima
+            # Esto maneja el caso de que la profundidad máxima sea una pared recta ancha
+            deepest_indices = np.where(gap_ranges >= max_depth - 0.1)[0]
+            
+            # Promediamos esos índices para apuntar al centro de la zona MÁS ALEJADA
+            best_idx_in_gap = int(np.mean(deepest_indices))
+            best_idx = gap_start + best_idx_in_gap
+        else:
+            # Fallback de seguridad si no hay huecos (apuntar al frente)
+            best_idx = len(proc_ranges) // 2
+            
         steering_angle = proc_angles[best_idx]
 
         # 7. Publicar
