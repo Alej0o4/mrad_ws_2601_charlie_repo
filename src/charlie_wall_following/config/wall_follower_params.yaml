@@ -2,7 +2,7 @@
 dist_finder:
   ros__parameters:
     #desired_distance: 0.8       # Metros a la pared
-    desired_distance: 0.3
+    desired_distance: 0.5
     desired_wall_side: -1       # 1: Izquierda, -1: Derecha
     lookahead_dist: 0.8     # Metros a proyectar a futuro (
     theta: 0.87 ##1.075            # Ángulo de apertura (60 grados en radianes)
@@ -14,5 +14,5 @@ control:
   ros__parameters:
     kp: 1.8                     # Ganancia Proporcional (Fuerza de giro)
     kd: 0.6                     # Ganancia Derivativa (Amortiguación)
-    max_speed: 0.04            # Velocidad máxima en rectas (m/s) con 0.5 estaba funvionando 
+    max_speed: 0.5            # Velocidad máxima en rectas (m/s) con 0.5 estaba funvionando 
     max_steering: 1.5           # Límite físico de las llantas (rad)

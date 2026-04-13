@@ -71,8 +71,8 @@ class DistFinder(Node):
         r_dist = np.mean(right_valid) if len(right_valid) > 0 else 5.0
 
         # Example: Simple logic to favor the closer wall
-        side_threshold = 10000.8
-        right_priority_bonus = 1000.4
+        side_threshold = 0.8
+        right_priority_bonus = 0.5
 
         if self.desired_wall_side == -1:
             # Solo cambia a la izquierda si la pared izquierda está REALMENTE más cerca
