@@ -188,7 +188,7 @@ class DistFinder(Node):
         # X = dist * cos(theta), Y = dist * sin(theta)
         
         # Ángulos actuales (Recalculamos lo mismo que en getRange para dibujar)
-        LIDAR_OFFSET = 0.0
+        LIDAR_OFFSET = 3.1416
         angle_b = self.normalize_angle(self.ray_b_angle + LIDAR_OFFSET)
         angle_a = self.normalize_angle(self.ray_b_angle - (self.theta * self.desired_wall_side) + LIDAR_OFFSET)
 

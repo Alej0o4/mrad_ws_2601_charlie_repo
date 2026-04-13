@@ -160,15 +160,14 @@ class TtcGapFinder(Node):
     def publish_debug_scan(self, proc_ranges, original_msg):
         """
         Publica un LaserScan falso que muestra lo que ve el algoritmo (Burbujas = 0)
+        Rotado 180 grados (+ np.pi) puramente para visualización en RViz.
         """
         debug_msg = LaserScan()
         debug_msg.header = original_msg.header
         
-        # Ajustamos los parámetros del scan porque recortamos el FOV
-        # El ángulo mínimo ahora es el primero de nuestro array recortado (-90)
-        # Nota: Esto asume simetría en el recorte
-        debug_msg.angle_min = -self.fov_angle 
-        debug_msg.angle_max = self.fov_angle
+        # FIX VISUAL: Sumamos np.pi (180 grados) a los ángulos base
+        debug_msg.angle_min = -self.fov_angle + np.pi
+        debug_msg.angle_max = self.fov_angle + np.pi
         debug_msg.angle_increment = original_msg.angle_increment
         debug_msg.time_increment = original_msg.time_increment
         debug_msg.scan_time = original_msg.scan_time
@@ -180,6 +179,11 @@ class TtcGapFinder(Node):
 
     def publish_debug_markers(self, target_angle, gap_start_angle, gap_end_angle, header):
         marker_array = MarkerArray()
+        
+        # FIX VISUAL: Desfasamos todos los ángulos 180 grados (np.pi) solo para dibujar
+        vis_target = target_angle + np.pi
+        vis_start = gap_start_angle + np.pi
+        vis_end = gap_end_angle + np.pi
         
         # Marcador 1: Flecha de Dirección (Verde)
         arrow = Marker()
@@ -193,11 +197,11 @@ class TtcGapFinder(Node):
         arrow.scale.z = 0.1
         arrow.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0) # Verde
         
-        # Puntos de la flecha (Origen -> Destino)
+        # Puntos de la flecha (Origen -> Destino) usando vis_target
         start_pt = Point(x=0.0, y=0.0, z=0.0)
         end_pt = Point(
-            x=2.0 * np.cos(target_angle), # Longitud fija 2m para que se vea bien
-            y=2.0 * np.sin(target_angle), 
+            x=2.0 * np.cos(vis_target), 
+            y=2.0 * np.sin(vis_target), 
             z=0.0
         )
         arrow.points = [start_pt, end_pt]
@@ -212,16 +216,15 @@ class TtcGapFinder(Node):
         gap_lines.scale.x = 0.01
         gap_lines.color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0) # Rojo
         
-        # Linea Inicio Gap
-        p1 = Point(x=3.0 * np.cos(gap_start_angle), y=3.0 * np.sin(gap_start_angle), z=0.0)
-        # Linea Fin Gap
-        p2 = Point(x=3.0 * np.cos(gap_end_angle), y=3.0 * np.sin(gap_end_angle), z=0.0)
+        # Linea Inicio Gap usando vis_start
+        p1 = Point(x=3.0 * np.cos(vis_start), y=3.0 * np.sin(vis_start), z=0.0)
+        # Linea Fin Gap usando vis_end
+        p2 = Point(x=3.0 * np.cos(vis_end), y=3.0 * np.sin(vis_end), z=0.0)
         
         gap_lines.points = [start_pt, p1, start_pt, p2]
 
         marker_array.markers = [arrow, gap_lines]
         self.marker_pub.publish(marker_array)
-
 def main(args=None):
     rclpy.init(args=args)
     node = TtcGapFinder()

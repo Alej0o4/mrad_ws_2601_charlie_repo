@@ -24,7 +24,6 @@ def generate_launch_description():
         # Remap si tu odometría viene de otro lado (ej: rf2o)
         remappings=[
             ('/odom', '/odom'), 
-            ('/scan', '/scan')
         ]
     )
 
