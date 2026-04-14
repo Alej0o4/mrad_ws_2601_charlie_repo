@@ -163,8 +163,25 @@ class TtcGapFinder(Node):
         ends = np.where(diff == -1)[0]
         if len(starts) == 0: return 0, len(ranges)-1
         lengths = ends - starts
-        max_idx = np.argmax(lengths)
-        return starts[max_idx], ends[max_idx]
+        best_score = -1
+        best_idx = 0
+        
+        for i in range(len(starts)):
+            width = ends[i] - starts[i]
+            # Extraemos los rayos del hueco actual
+            gap_rays = ranges[starts[i]:ends[i]]
+            # Profundidad promedio del hueco
+            depth = np.mean(gap_rays)
+            
+            # PUNTUACIÓN DE CAMPEONATO: Profundidad domina, el ancho desempata
+            # Los factores (weights) los calibras en la pista
+            score = (depth * 2.5) + (width * 1.0)
+            
+            if score > best_score:
+                best_score = score
+                best_idx = i
+                
+        return starts[best_idx], ends[best_idx]
 
     # --- FUNCIONES DE DEBUG ---
 
