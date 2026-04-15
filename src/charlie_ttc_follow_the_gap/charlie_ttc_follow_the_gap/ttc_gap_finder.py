@@ -143,10 +143,38 @@ class TtcGapFinder(Node):
             
         steering_angle = proc_angles[best_idx]
 
+        # ---------------------------------------------------------
+        # 6.5. MODULADOR GEOMÉTRICO DE VELOCIDAD (Freno por entorno)
+        # ---------------------------------------------------------
+        # A. Evaluar profundidad del objetivo
+        target_depth = proc_ranges[best_idx]
+        
+        # B. Evaluar proximidad del obstáculo más cercano (situational awareness)
+        # Usamos 'ranges' crudo para no ser engañados por la burbuja de ceros que dibujamos
+        raw_valid = np.isfinite(ranges) & (ranges > 0.1)
+        if np.any(raw_valid):
+            closest_obstacle = np.min(ranges[raw_valid])
+        else:
+            closest_obstacle = 4.0
+
+        # C. Ecuaciones de Modulación (Clamping lineal)
+        # Si objetivo > 3.0m = 1.0 (100%). Si objetivo < 1.0m = 0.4 (40%)
+        mult_depth = np.clip(target_depth / 3.0, 0.4, 1.0)
+        
+        # Si pared lateral > 0.8m = 1.0 (100%). Si pared < 0.3m = 0.5 (50%)
+        mult_prox = np.clip(closest_obstacle / 0.8, 0.5, 1.0)
+        
+        # El multiplicador final es el "peor caso" entre la profundidad y la estrechez
+        geometric_multiplier = min(mult_depth, mult_prox)
+
         # 7. Publicar
         out_msg = TwistStamped()
         out_msg.header = msg.header
+        # Enviamos el ángulo como siempre
         out_msg.twist.angular.z = float(steering_angle)
+        # ENVIAMOS EL MULTIPLICADOR EN EL CANAL LINEAL
+        out_msg.twist.linear.x = float(geometric_multiplier) 
+        
         self.angle_pub.publish(out_msg)
 
         # --- LOGICA DE VISUALIZACIÓN ---
