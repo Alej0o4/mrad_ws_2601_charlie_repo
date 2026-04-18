@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="zulu_robot">
+
+    <!-- Example link -->
+    <xacro:include filename="$(find charlie_description)/macros/properties.xacro"/>
+    <xacro:include filename="robot_core.xacro"/>
+    <!-- Sensors -->
+    <xacro:include filename="$(find charlie_description)/sensors/lidar_a1.xacro"/><!-- Lidar sensor -->
+
+    <xacro:include filename="$(find charlie_description)/sensors/imu_a.xacro"/> <!-- Camera sensor -->
+
+    <!-- ros2_control -->
+    <xacro:include filename="ros2_control.xacro"/>
+
+</robot>
