@@ -144,35 +144,40 @@ class TtcGapFinder(Node):
         steering_angle = proc_angles[best_idx]
 
         # ---------------------------------------------------------
-        # 6.5. MODULADOR GEOMÉTRICO DE VELOCIDAD (Freno por entorno)
+        # 6.5. MÁQUINA DE ESTADOS GEOMÉTRICA (Discreta)
         # ---------------------------------------------------------
-        # A. Evaluar profundidad del objetivo
         target_depth = proc_ranges[best_idx]
         
-        # B. Evaluar proximidad del obstáculo más cercano (situational awareness)
-        # Usamos 'ranges' crudo para no ser engañados por la burbuja de ceros que dibujamos
         raw_valid = np.isfinite(ranges) & (ranges > 0.1)
         if np.any(raw_valid):
             closest_obstacle = np.min(ranges[raw_valid])
         else:
             closest_obstacle = 4.0
 
-        # C. Ecuaciones de Modulación (Clamping lineal)
-        # Si objetivo > 3.0m = 1.0 (100%). Si objetivo < 1.0m = 0.4 (40%)
-        mult_depth = np.clip(target_depth / 3.0, 0.4, 1.0)
+        # Definimos los estados (Tú puedes ajustar las distancias)
+        # El valor que asignamos será el multiplicador exacto que queremos enviar.
         
-        # Si pared lateral > 0.8m = 1.0 (100%). Si pared < 0.3m = 0.5 (50%)
-        mult_prox = np.clip(closest_obstacle / 0.8, 0.5, 1.0)
-        
-        # El multiplicador final es el "peor caso" entre la profundidad y la estrechez
-        geometric_multiplier = min(mult_depth, mult_prox)
+        if closest_obstacle < 0.4 or target_depth < 1.0:
+            # ESTADO CRÍTICO: Pasillo muy estrecho o pared enfrente.
+            # Aquí mandas exactamente el porcentaje que sabes que funciona (ej. el 4% seguro)
+            # Asumamos que tu velocidad mínima funcional es un multiplicador de 0.2 (20% de max_speed)
+            geometric_multiplier = 0.004  
+            
+        elif closest_obstacle < 0.8 or target_depth < 2.0:
+            # ESTADO PRECAUCIÓN: Entorno moderado o acercándose a curva.
+            # Un valor intermedio probado que no caiga en el salto del motor.
+            geometric_multiplier = 0.004
+            
+        else:
+            # ESTADO CRUISE: Vía libre.
+            geometric_multiplier = 1.00  
 
         # 7. Publicar
         out_msg = TwistStamped()
         out_msg.header = msg.header
-        # Enviamos el ángulo como siempre
         out_msg.twist.angular.z = float(steering_angle)
-        # ENVIAMOS EL MULTIPLICADOR EN EL CANAL LINEAL
+        
+        # Enviamos el multiplicador DISCRETO (0.2, 0.6 o 1.0)
         out_msg.twist.linear.x = float(geometric_multiplier) 
         
         self.angle_pub.publish(out_msg)

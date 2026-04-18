@@ -44,36 +44,37 @@ class TtcControl(Node):
     
     def callback(self, msg):
         raw_angle = msg.twist.angular.z
-        geometric_multiplier = msg.twist.linear.x  # <--- RECIBIMOS EL MULTIPLICADOR
+        geometric_multiplier = msg.twist.linear.x  
 
-        # Filtro de suavizado
         alpha = 0.85
         target_angle = (alpha * raw_angle) + ((1.0 - alpha) * self.last_target_angle)
         self.last_target_angle = target_angle 
 
-        # --- LEY DE CONTROL (Generación de Omega) ---
         angular_cmd = self.kp * target_angle
         angular_cmd = max(min(angular_cmd, self.max_steering), -self.max_steering)
 
         # ---------------------------------------------------------
-        # LEY DE VELOCIDAD ADAPTATIVA (Fusión Geometría + Cinemática)
+        # LEY DE VELOCIDAD POR ESTADOS
         # ---------------------------------------------------------
-        min_survival_speed = 0.3 
+        min_survival_speed = 0.04  # Ajusta esto a tu famosa velocidad del "4%" en m/s
         k_factor = 0.8           
         
-        # 1. Aplicamos el castigo por entorno (Pasillos estrechos o paredes de frente)
-        dynamic_max_speed = self.max_speed * geometric_multiplier
-        
-        # 2. Aplicamos el castigo por giro (Campana de Gauss para no derrapar en curva)
-        decay = np.exp(-k_factor * (angular_cmd ** 2))
-        
-        # Rango de velocidad disponible basado en el nuevo tope dinámico
-        speed_range = dynamic_max_speed - min_survival_speed
-        
-        # Velocidad final segura
-        linear_cmd = min_survival_speed + (speed_range * decay)
+        if geometric_multiplier < 0.5:
+            # MODO CRÍTICO: El motor está en su límite bajo.
+            # IGNORAMOS la campana de Gauss para no ahogar el motor en la curva.
+            linear_cmd = self.max_speed * geometric_multiplier
+            
+        else:
+            # MODO NORMAL/CRUISE: Tenemos inercia suficiente.
+            # Aplicamos la reducción por curva normalmente.
+            dynamic_max_speed = self.max_speed * geometric_multiplier
+            decay = np.exp(-k_factor * (angular_cmd ** 2))
+            speed_range = dynamic_max_speed - min_survival_speed
+            linear_cmd = min_survival_speed + (speed_range * decay)
 
-        # --- PUBLICACIÓN ---
+        # Seguridad absoluta final
+        linear_cmd = max(linear_cmd, min_survival_speed)
+
         out_msg = TwistStamped()
         out_msg.header = msg.header
         out_msg.twist.linear.x = float(linear_cmd)
