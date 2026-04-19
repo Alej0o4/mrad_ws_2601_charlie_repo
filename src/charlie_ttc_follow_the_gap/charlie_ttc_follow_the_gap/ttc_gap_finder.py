@@ -14,9 +14,9 @@ class TtcGapFinder(Node):
         super().__init__('ttc_gap_finder')
 
         # --- PARÁMETROS ---
-        self.declare_parameter('robot_width', 0.44)
-        self.declare_parameter('ttc_min', 0.7)
-        self.declare_parameter('fov_angle', np.radians(90))
+        self.declare_parameter('robot_width', 0.3)
+        self.declare_parameter('ttc_min', 1.7)
+        self.declare_parameter('fov_angle', np.radians(45))
         self.declare_parameter('safety_margin', 0.15) 
         self.declare_parameter('debug_mode', True) 
 

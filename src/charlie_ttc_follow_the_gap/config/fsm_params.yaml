@@ -1,0 +1,19 @@
+fsm_control:
+  ros__parameters:
+    wheelbase: 0.257
+    max_steering_deg: 20.0
+    kp: 1.2
+    steering_alpha: 0.7     # 1.0 = respuesta instantánea, 0.1 = muy suave
+    v_slow_real: 0.412
+    v_fast_real: 1.255
+    dist_critical: 0.9      # Frenar si algo se acerca por los lados a 90cm
+    angle_critical_deg: 12.0 
+    depth_critical: 2.5     # Frenar si la pared frontal está a menos de 2.5m
+
+fsm_gap_finder:
+  ros__parameters:
+    robot_width: 0.3
+    fov_angle: 1.047        # 60 grados en radianes
+    safety_margin: 0.2
+    horizon_dist: 3.5
+    debug_mode: true        # NUEVO: true para ver markers en RViz, false para competencia
