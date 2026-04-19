@@ -17,7 +17,7 @@ def generate_launch_description():
     description_pkg_name = "charlie_description"
     aebs_pkg_name = "charlie_aebs"
 
-    robot_name = "vicon_urdf"
+    robot_name = "ackermann_urdf"
     use_sim_time = LaunchConfiguration("use_sim_time")
 
     # ... Robot description (xacro -> URDF XML string) ...
@@ -41,6 +41,13 @@ def generate_launch_description():
         package='charlie_bringup', # Cambia esto al paquete donde guardes tu script python
         executable='vicon_to_odom_node', # Nombre configurado en setup.py
         name='vicon_to_odom',
+        output='screen'
+    )
+
+    open_loop_odom_node = Node(
+        package='charlie_bringup',
+        executable='open_loop_odom_node',
+        name='open_loop_odom',
         output='screen'
     )
 
@@ -89,11 +96,12 @@ def generate_launch_description():
                 description="Use simulation (Gazebo) clock if true",
             ),
             rsp,
-            vicon_odom_node,
+            # vicon_odom_node,
             joy_node,
             teleop_node,
             twist_mux_node,
             lidar_node,
-            # aebs_launch
+            open_loop_odom_node
+
         ]
     )

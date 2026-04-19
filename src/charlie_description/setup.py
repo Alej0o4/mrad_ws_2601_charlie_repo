@@ -16,6 +16,7 @@ setup(
         (os.path.join('share', package_name,'diffdrive_urdf'), glob('diffdrive_urdf/*.*')),
         (os.path.join('share', package_name,'vicon_urdf'), glob('vicon_urdf/*.*')),
         (os.path.join('share', package_name,'macros'), glob('macros/*.*')),
+        (os.path.join('share', package_name,'ackermann_urdf'), glob('ackermann_urdf/*.*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

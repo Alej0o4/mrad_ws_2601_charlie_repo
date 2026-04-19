@@ -9,6 +9,7 @@ open_loop_odom_node:
     # Configuración del Sistema
     update_rate_hz: 50.0
     wheelbase: 0.257
+    wheel_radius: 0.053
     
     # --- Look-Up Table (Valores Empíricos en m/s y rad/s) ---
     v_slow: 0.412   # Velocidad medida cuando PWM es 0.04

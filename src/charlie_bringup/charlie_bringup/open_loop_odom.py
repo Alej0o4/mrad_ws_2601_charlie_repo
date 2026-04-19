@@ -7,6 +7,7 @@ import math
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TwistStamped, TransformStamped, Quaternion
 from tf2_ros import TransformBroadcaster
+from sensor_msgs.msg import JointState
 
 def quaternion_from_euler(roll, pitch, yaw):
     """Convierte ángulos de Euler a Cuaternión."""
@@ -35,6 +36,7 @@ class OpenLoopOdomNode(Node):
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('update_rate_hz', 50.0)
         self.declare_parameter('wheelbase', 0.257) 
+        self.declare_parameter('wheel_radius', 0.053) # Radio de la llanta (de tu Xacro)
         
         # Look-Up Table: Velocidades Empíricas (Verdad Absoluta, m/s y rad/s)
         self.declare_parameter('v_slow', 0.412) 
@@ -54,6 +56,7 @@ class OpenLoopOdomNode(Node):
         self.odom_frame = self.get_parameter('odom_frame').value
         self.update_rate_hz = self.get_parameter('update_rate_hz').value
         self.wheelbase = self.get_parameter('wheelbase').value
+        self.wheel_radius = self.get_parameter('wheel_radius').value
         
         self.v_slow = self.get_parameter('v_slow').value
         self.v_fast = self.get_parameter('v_fast').value
@@ -73,6 +76,8 @@ class OpenLoopOdomNode(Node):
         self.odom_publisher = self.create_publisher(Odometry, self.odom_topic, 10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
+        self.joint_publisher = self.create_publisher(JointState, '/joint_states', 10)
+
         timer_period = 1.0 / self.update_rate_hz
         self.timer = self.create_timer(timer_period, self.integration_loop)
 
@@ -81,6 +86,9 @@ class OpenLoopOdomNode(Node):
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
+        # Variables de estado para los joints
+        self.wheel_angle = 0.0
+        self.steering_angle = 0.0
         self.last_time = self.get_clock().now()
 
         self.get_logger().info("Nodo de Odometría (Clasificador de PWM) iniciado.")
@@ -122,15 +130,15 @@ class OpenLoopOdomNode(Node):
         return getattr(self, 'v_real', 0.0), getattr(self, 'w_real', 0.0)
 
     def integration_loop(self):
-        """Bucle principal que integra la posición de forma continua."""
+        """Bucle principal que integra la posición y calcula la cinemática de los joints."""
         current_time = self.get_clock().now()
         dt = (current_time - self.last_time).nanoseconds / 1e9
         self.last_time = current_time
 
-        # 1. Obtener velocidades reales desde la LUT
+        # 1. Obtener velocidades reales desde el modelo híbrido
         v, w = self.get_velocities_from_state()
 
-        # 2. Cinemática (Bicycle Model)
+        # 2. Cinemática del Chasis (Bicycle Model)
         delta_x = v * math.cos(self.theta) * dt
         delta_y = v * math.sin(self.theta) * dt
         delta_theta = w * dt
@@ -139,7 +147,23 @@ class OpenLoopOdomNode(Node):
         self.y += delta_y
         self.theta += delta_theta
 
-        # 3. Publicar Transform (TF)
+        # 3. Cinemática Inversa para los Joints (Llantas y Dirección)
+        # Rotación de las ruedas: w_rueda = v / radio
+        self.wheel_angle += (v / self.wheel_radius) * dt
+        # Mantener el ángulo entre 0 y 2*pi para evitar desbordamientos a largo plazo
+        self.wheel_angle = self.wheel_angle % (2 * math.pi)
+
+        # Ángulo de dirección (Steering angle): delta = arctan((w * L) / v)
+        # Protegemos contra la división por cero cuando el robot está quieto
+        if abs(v) > 0.001:
+            self.steering_angle = math.atan((w * self.wheelbase) / v)
+        elif abs(w) > 0.001:
+            # Si v es 0 pero está recibiendo comando de giro (solo posible en simulación o si resbala)
+            self.steering_angle = math.copysign(math.pi/4, w) # Asume el máximo giro (45 deg)
+        else:
+            self.steering_angle = 0.0 # Recto si está quieto
+
+        # 4. Publicar Transform (TF) ... (Se mantiene igual)
         t = TransformStamped()
         t.header.stamp = current_time.to_msg()
         t.header.frame_id = self.odom_frame
@@ -150,7 +174,7 @@ class OpenLoopOdomNode(Node):
         t.transform.rotation = quaternion_from_euler(0, 0, self.theta)
         self.tf_broadcaster.sendTransform(t)
 
-        # 4. Publicar Mensaje de Odometría
+        # 5. Publicar Mensaje de Odometría ... (Se mantiene igual)
         odom_msg = Odometry()
         odom_msg.header.stamp = current_time.to_msg()
         odom_msg.header.frame_id = self.odom_frame
@@ -158,12 +182,31 @@ class OpenLoopOdomNode(Node):
         odom_msg.pose.pose.position.x = self.x
         odom_msg.pose.pose.position.y = self.y
         odom_msg.pose.pose.orientation = t.transform.rotation
-        
-        # Agregar las velocidades empíricas reales que estamos inyectando
         odom_msg.twist.twist.linear.x = v
         odom_msg.twist.twist.angular.z = w
-
         self.odom_publisher.publish(odom_msg)
+
+        # 6. Publicar Joint States para RViz
+        # Asegúrate de que estos nombres coincidan EXACTAMENTE con los 'joint name' de tu Xacro
+        joint_msg = JointState()
+        joint_msg.header.stamp = current_time.to_msg()
+        joint_msg.name = [
+            'right_steering_joint', 
+            'left_steering_joint',
+            'rightf_wheel_joint', 
+            'leftf_wheel_joint',
+            'rightb_wheel_joint', 
+            'leftb_wheel_joint'
+        ]
+        joint_msg.position = [
+            self.steering_angle,   # right_steering_joint
+            self.steering_angle,   # left_steering_joint
+            self.wheel_angle,      # rightf_wheel_joint
+            self.wheel_angle,      # leftf_wheel_joint
+            self.wheel_angle,      # rightb_wheel_joint
+            self.wheel_angle       # leftb_wheel_joint
+        ]
+        self.joint_publisher.publish(joint_msg)
 
 def main(args=None):
     rclpy.init(args=args)
