@@ -141,7 +141,7 @@ class FsmGapFinder(Node):
             gap_rays = ranges[starts[i]:ends[i]]
             depth = np.mean(gap_rays)
             
-            score = (depth * 2.5) + (width * 1.0)
+            score = (depth * 2.0) + (width * 1.0)
             
             if score > best_score:
                 best_score = score
