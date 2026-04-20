@@ -12,20 +12,30 @@ class FsmGapFinder(Node):
     def __init__(self):
         super().__init__('fsm_gap_finder')
 
-        # --- PARÁMETROS ---
+        # --- PARÁMETROS BÁSICOS ---
         self.declare_parameter('robot_width', 0.3)
         self.declare_parameter('fov_angle', np.radians(60))
         self.declare_parameter('safety_margin', 0.15) 
         self.declare_parameter('horizon_dist', 4.0)
         self.declare_parameter('debug_mode', True) 
 
+        # --- [NUEVO] PARÁMETROS AVANZADOS ---
+        # Penalización por cambio brusco de dirección (Histéresis)
+        self.declare_parameter('hysteresis_penalty', 3.0)
+        # 0.0 = Solo mira la profundidad, 1.0 = Solo mira el centro del hueco
+        self.declare_parameter('center_bias', 0.4) 
+
         self.width = self.get_parameter('robot_width').value
         self.fov_angle = self.get_parameter('fov_angle').value
         self.safety_margin = self.get_parameter('safety_margin').value
         self.horizon_dist = self.get_parameter('horizon_dist').value
         self.debug_mode = self.get_parameter('debug_mode').value
+        self.hysteresis_penalty = self.get_parameter('hysteresis_penalty').value
+        self.center_bias = self.get_parameter('center_bias').value
         
         self.angles = None
+        # [NUEVO] Memoria de la última dirección elegida
+        self.last_target_angle = 0.0
 
         qos_sensor = QoSProfile(reliability=QoSReliabilityPolicy.BEST_EFFORT, history=QoSHistoryPolicy.KEEP_LAST, depth=1)
         qos_reliable = QoSProfile(depth=10)
@@ -41,7 +51,7 @@ class FsmGapFinder(Node):
             self.proc_scan_pub = self.create_publisher(LaserScan, '/proc_scan', qos_reliable)
             self.marker_pub = self.create_publisher(MarkerArray, '/debug_markers', qos_reliable)
 
-        self.get_logger().info("FSM Gap Finder Ready (Clean Architecture).")
+        self.get_logger().info("FSM Gap Finder Ready (Advanced Scoring & Hybrid Targeting).")
 
     # ==========================================================
     # ORQUESTADOR PRINCIPAL (Callback)
@@ -57,14 +67,18 @@ class FsmGapFinder(Node):
         # 2. Extensión de Disparidad (Inflar obstáculos)
         proc_ranges = self._apply_disparity_extender(proc_ranges, msg.angle_increment)
 
-        # 3. Encontrar el mejor hueco (con sistema de puntuación)
-        target_idx, gap_start, gap_end = self._score_and_find_gap(proc_ranges)
+        # 3. Encontrar el mejor hueco (con sistema de puntuación e histéresis)
+        # [NUEVO] Pasamos los ángulos para poder calcular la penalización direccional
+        target_idx, gap_start, gap_end = self._score_and_find_gap(proc_ranges, proc_angles)
 
         # 4. Extracción de datos para el controlador FSM
         target_angle = proc_angles[target_idx]
         target_depth = proc_ranges[target_idx]
         valid_ranges = proc_ranges[proc_ranges > 0.1]
         closest_obstacle = np.min(valid_ranges) if len(valid_ranges) > 0 else self.horizon_dist
+
+        # [NUEVO] Guardamos el ángulo elegido para recordarlo en el próximo ciclo
+        self.last_target_angle = target_angle
 
         # 5. Publicar a la Máquina de Estados
         self._publish_fsm_data(msg.header, target_angle, closest_obstacle, target_depth)
@@ -80,7 +94,6 @@ class FsmGapFinder(Node):
     # ==========================================================
     
     def _preprocess_scan(self, ranges):
-        """Limpia infinitos y recorta los datos al Campo de Visión (FOV)."""
         clean_ranges = np.nan_to_num(ranges, posinf=self.horizon_dist, neginf=0.0)
         clean_ranges = np.clip(clean_ranges, 0.0, self.horizon_dist)
 
@@ -91,7 +104,6 @@ class FsmGapFinder(Node):
         return proc_ranges, proc_angles
 
     def _apply_disparity_extender(self, ranges, angle_increment):
-        """Busca bordes y sobrescribe los huecos basándose en el ancho del robot."""
         threshold = 0.2
         diffs = np.diff(ranges)
         disparity_indices = np.where(np.abs(diffs) > threshold)[0]
@@ -101,28 +113,26 @@ class FsmGapFinder(Node):
             farther_idx = idx+1 if closer_idx == idx else idx
             closer_dist = ranges[closer_idx]
             
-            # Dinamismo del margen de seguridad
             margin = self.safety_margin * 1.5 if closer_dist < 0.5 else self.safety_margin
             safety_radius = (self.width / 2.0) + margin 
             
             bubble_angle = np.arctan2(safety_radius, max(closer_dist, 0.1))
             bubble_indices = int(bubble_angle / angle_increment)
             
-            if closer_idx == idx: # Obstáculo a la izquierda
+            if closer_idx == idx:
                 start = farther_idx
                 end = min(len(ranges), farther_idx + bubble_indices)
-            else: # Obstáculo a la derecha
+            else:
                 start = max(0, farther_idx - bubble_indices + 1)
                 end = farther_idx + 1
                 
             ranges[start:end] = closer_dist
 
-        # Zonas demasiado cercanas se consideran paredes letales
         ranges[ranges < 0.2] = 0.0
         return ranges
 
-    def _score_and_find_gap(self, ranges):
-        """Evalúa los huecos disponibles usando peso/ancho y retorna el mejor objetivo."""
+    def _score_and_find_gap(self, ranges, angles):
+        """Evalúa huecos usando ancho, profundidad y MEMORIA direccional."""
         mask = ranges > 0.05
         padded_mask = np.concatenate(([False], mask, [False]))
         diff = np.diff(padded_mask.astype(int))
@@ -132,16 +142,26 @@ class FsmGapFinder(Node):
         if len(starts) == 0: 
             return len(ranges) // 2, 0, len(ranges) - 1
             
-        best_score = -1
+        best_score = -float('inf')
         best_gap_idx = 0
         
-        # PUNTUACIÓN DE CAMPEONATO (Score)
+        # --- PUNTUACIÓN CON HISTÉRESIS ---
         for i in range(len(starts)):
             width = ends[i] - starts[i]
             gap_rays = ranges[starts[i]:ends[i]]
             depth = np.mean(gap_rays)
             
-            score = (depth * 2.0) + (width * 1.0)
+            # [NUEVO] Calcular el ángulo medio de este hueco
+            mid_idx = int((starts[i] + ends[i]) / 2)
+            gap_mid_angle = angles[mid_idx]
+            
+            # [NUEVO] Calcular penalización por cambio de dirección
+            # Cuanto más se aleje de nuestro último objetivo, más le restamos
+            angle_diff = abs(gap_mid_angle - self.last_target_angle)
+            penalty = angle_diff * self.hysteresis_penalty
+            
+            # Puntuación final: Profundidad + Ancho - Penalización por volantazo
+            score = (depth * 2.0) + (width * 1.0) - penalty
             
             if score > best_score:
                 best_score = score
@@ -150,17 +170,26 @@ class FsmGapFinder(Node):
         gap_start = starts[best_gap_idx]
         gap_end = ends[best_gap_idx]
         
-        # Encontrar el punto objetivo dentro del mejor hueco
+        # --- [NUEVO] SELECCIÓN DE OBJETIVO HÍBRIDO ---
+        # 1. Índice de la Máxima Profundidad
         gap_ranges = ranges[gap_start:gap_end]
         max_depth = np.max(gap_ranges)
         deepest_indices = np.where(gap_ranges >= max_depth - 0.1)[0]
-        best_idx_in_gap = int(np.mean(deepest_indices))
-        best_target_idx = gap_start + best_idx_in_gap
+        depth_idx_in_gap = int(np.mean(deepest_indices))
+        absolute_depth_idx = gap_start + depth_idx_in_gap
+        
+        # 2. Índice del Centro Geométrico del hueco
+        absolute_center_idx = int((gap_start + gap_end) / 2)
+        
+        # 3. Mezcla ponderada (Blend)
+        best_target_idx = int((self.center_bias * absolute_center_idx) + ((1.0 - self.center_bias) * absolute_depth_idx))
+        
+        # Aseguramos que el índice no se salga de los límites del hueco por seguridad
+        best_target_idx = max(gap_start, min(best_target_idx, gap_end - 1))
         
         return best_target_idx, gap_start, gap_end
 
     def _publish_fsm_data(self, header, angle, closest_obstacle, depth):
-        """Empaqueta y publica los datos extraídos para el nodo de Control."""
         data_msg = TwistStamped()
         data_msg.header = header
         data_msg.twist.angular.z = float(angle)
@@ -176,7 +205,6 @@ class FsmGapFinder(Node):
         debug_msg = LaserScan()
         debug_msg.header = original_msg.header
         
-        # FIX VISUAL: Sumamos np.pi (180 grados) a los ángulos base
         debug_msg.angle_min = -self.fov_angle + np.pi
         debug_msg.angle_max = self.fov_angle + np.pi
         debug_msg.angle_increment = original_msg.angle_increment
