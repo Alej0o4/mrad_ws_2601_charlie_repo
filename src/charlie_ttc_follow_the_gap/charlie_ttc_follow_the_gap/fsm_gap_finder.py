@@ -105,29 +105,50 @@ class FsmGapFinder(Node):
 
     def _apply_disparity_extender(self, ranges, angle_increment):
         threshold = 0.2
-        diffs = np.diff(ranges)
+        
+        # 1. Creamos una copia inmutable para leer la verdad absoluta del LiDAR
+        # Así evitamos que burbujas anteriores alteren los cálculos siguientes.
+        original_ranges = ranges.copy()
+        
+        # Calculamos los saltos usando la copia inmutable
+        diffs = np.diff(original_ranges)
         disparity_indices = np.where(np.abs(diffs) > threshold)[0]
         
         for idx in disparity_indices:
-            closer_idx = idx if ranges[idx] < ranges[idx+1] else idx+1
-            farther_idx = idx+1 if closer_idx == idx else idx
-            closer_dist = ranges[closer_idx]
+            # Leemos las distancias desde el arreglo original intacto
+            if original_ranges[idx] < original_ranges[idx+1]:
+                closer_idx = idx
+                farther_idx = idx + 1
+            else:
+                closer_idx = idx + 1
+                farther_idx = idx
+                
+            closer_dist = original_ranges[closer_idx]
             
+            # Cálculo del tamaño de la burbuja (Se mantiene igual)
             margin = self.safety_margin * 1.5 if closer_dist < 0.5 else self.safety_margin
             safety_radius = (self.width / 2.0) + margin 
             
             bubble_angle = np.arctan2(safety_radius, max(closer_dist, 0.1))
             bubble_indices = int(bubble_angle / angle_increment)
             
-            if closer_idx == idx:
+            if closer_idx == idx: # Obstáculo a la izquierda, inflar hacia la derecha
                 start = farther_idx
                 end = min(len(ranges), farther_idx + bubble_indices)
-            else:
+                
+                # 2. LA MAGIA: np.minimum
+                # Comparamos lo que ya hay en el arreglo (ranges) con nuestra nueva burbuja (closer_dist).
+                # Solo se sobrescribe si la nueva burbuja es MÁS CERCANA que lo que ya había.
+                ranges[start:end] = np.minimum(ranges[start:end], closer_dist)
+                
+            else: # Obstáculo a la derecha, inflar hacia la izquierda
                 start = max(0, farther_idx - bubble_indices + 1)
                 end = farther_idx + 1
                 
-            ranges[start:end] = closer_dist
+                # 2. LA MAGIA: np.minimum evita borrar obstáculos cercanos
+                ranges[start:end] = np.minimum(ranges[start:end], closer_dist)
 
+        # Zonas demasiado cercanas se consideran lava letal
         ranges[ranges < 0.2] = 0.0
         return ranges
 
