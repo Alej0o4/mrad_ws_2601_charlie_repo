@@ -17,7 +17,7 @@ class ViconToOdomNode(Node):
         # 3. Suscriptor al VICON (Ajusta '/vicon/pose' al tópico real de tu lab)
         self.t = TransformStamped()
         self.t.header.frame_id = 'odom'
-        self.t.child_frame_id = 'base_footprint'
+        self.t.child_frame_id = 'base_link'
         self.subscription = self.create_subscription(
             Pose,
             '/robot1/pose', 
@@ -26,7 +26,7 @@ class ViconToOdomNode(Node):
         
         self.odom_msg = Odometry()
         self.odom_msg.header.frame_id = 'odom'
-        self.odom_msg.child_frame_id = 'base_footprint'
+        self.odom_msg.child_frame_id = 'base_link'
         
         self.timer  = self.create_timer(0.1, self.timer_callback) # Opcional: para publicar TF a una tasa fija
         
