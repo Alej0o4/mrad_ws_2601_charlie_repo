@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TwistStamped
 import numpy as np
 
 class SysIdExcitationNode(Node):
@@ -26,7 +26,7 @@ class SysIdExcitationNode(Node):
 
         # --- PUBLICADOR Y CONTROL DE TIEMPO ---
         # Publicamos al tópico que el twist_mux está escuchando
-        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_ctrl', 10)
+        self.cmd_pub = self.create_publisher(TwistStamped, '/cmd_vel_ctrl', 10)
         
         # Frecuencia de 50Hz (0.02s) para enviar comandos continuos y suaves
         self.timer = self.create_timer(0.02, self.timer_callback)
@@ -41,12 +41,13 @@ class SysIdExcitationNode(Node):
         # Tiempo transcurrido en segundos
         t_elapsed = (self.get_clock().now() - self.start_time).nanoseconds / 1e9
 
-        msg = Twist()
+        msg = TwistStamped()
 
         # Si ya pasamos el último tiempo de la lista, detenemos el robot por seguridad
         if t_elapsed > self.t_keys[-1]:
-            msg.linear.x = 0.0
-            msg.angular.z = 0.0
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.twist.linear.x = 0.0
+            msg.twist.angular.z = 0.0
             self.cmd_pub.publish(msg)
             self.get_logger().info("Secuencia de excitación terminada. Vehículo detenido.", once=True)
             return
@@ -54,15 +55,17 @@ class SysIdExcitationNode(Node):
         # --- LÓGICA DE INTERPOLACIÓN ---
         if self.mode == 'linear':
             # numpy.interp interpola linealmente (Perfecto para RAMPAS - Sesión B)
-            msg.linear.x = float(np.interp(t_elapsed, self.t_keys, self.v_keys))
-            msg.angular.z = float(np.interp(t_elapsed, self.t_keys, self.w_keys))
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.twist.linear.x = float(np.interp(t_elapsed, self.t_keys, self.v_keys))
+            msg.twist.angular.z = float(np.interp(t_elapsed, self.t_keys, self.w_keys))
         
         elif self.mode == 'step':
             # Busca el índice del tiempo actual y mantiene el valor anterior (Perfecto para ESCALONES - Sesión A)
             # side='right' asegura que el escalón salte exactamente en el segundo indicado
             idx = np.searchsorted(self.t_keys, t_elapsed, side='right') - 1
-            msg.linear.x = float(self.v_keys[idx])
-            msg.angular.z = float(self.w_keys[idx])
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.twist.linear.x = float(self.v_keys[idx])
+            msg.twist.angular.z = float(self.w_keys[idx])
 
         self.cmd_pub.publish(msg)
 

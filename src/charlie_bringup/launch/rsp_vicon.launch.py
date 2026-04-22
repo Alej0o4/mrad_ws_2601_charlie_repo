@@ -96,12 +96,12 @@ def generate_launch_description():
                 description="Use simulation (Gazebo) clock if true",
             ),
             rsp,
-            # vicon_odom_node,
+            vicon_odom_node,
             joy_node,
             teleop_node,
             twist_mux_node,
             lidar_node,
-            open_loop_odom_node
+            # open_loop_odom_node
 
         ]
     )
