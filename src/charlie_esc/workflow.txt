@@ -1,0 +1,19 @@
+1. Ubícate en tu espacio de trabajo
+    cd ~/mrad_ws_2601_charlie_repo/src/charlie_esc
+
+2. Crea el Entorno Virtual
+    python3 -m venv .venv_sysid
+
+3. Activa el Entorno
+    source .venv_sysid/bin/activate
+
+4. Descarga las dependencias
+    pip install -r requirements.txt
+
+5. Ejecuta los scripts.
+    a. Para extraer datos del bag
+        Nota: cambiar sysid_run_adelante_1 por el experimento/bag que se desee
+        python3 scripts/extract_bag_updated.py bag_file/sysid/sysid_run_adelante_1
+    b. Para extraer la velocidad de los datos de odometría
+        Nota: cambiar sysid_run_adelante_1 por experiment deseado (ya tiene que existir los archivos .csv del primer script)
+        python3 scripts/compute_velocity_updated.py csv_files/sysid_run_adelante_1
