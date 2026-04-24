@@ -2,7 +2,7 @@ sysid_excitation_node:
   ros__parameters:
     interpolation_mode: "step"
     # [0s, 3s, 6s, 9s, 12s, 15s...]
-    t_keys: [0.0, 3.0,7.0] 
+    t_keys: [0.0, 3.0,6.0] 
     # Cambia estos valores a 0.3 (30%), 0.5 (50%), etc., según el experimento
-    v_keys: [0.0, 0.04, 0.0] 
+    v_keys: [0.0, 1.0, 0.0] 
     w_keys: [0.0, 0.0, 0.0]

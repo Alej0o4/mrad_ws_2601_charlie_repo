@@ -32,6 +32,7 @@ setup(
             'vicon_to_odom_node = charlie_bringup.pose2odom_node:main',
             'scan_inverter_node = charlie_bringup.lidar_node:main',
             'open_loop_odom_node = charlie_bringup.open_loop_odom:main',
+            'esc_node_custom_foc = charlie_bringup.esc_node_custom_foc:main',
         ],
     },
 )

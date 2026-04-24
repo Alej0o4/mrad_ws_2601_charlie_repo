@@ -71,7 +71,7 @@ def generate_launch_description():
     twist_mux_node = Node(package='twist_mux', 
                     executable='twist_mux',
                     parameters=[twist_mux_params,{'use_sim_time': False}],
-                    remappings=[('/cmd_vel_out','/cmd_vel_raw')]
+                    remappings=[('/cmd_vel_out','/cmd_vel_stamped')]
     )
 
     aebs_launch = IncludeLaunchDescription(
