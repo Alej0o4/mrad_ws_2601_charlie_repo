@@ -77,7 +77,7 @@ class FsmControl(Node):
         if closest_dist < self.d_crit or abs(target_angle) > self.a_crit or target_depth < self.depth_crit:
             return "SLOW", 0.04, self.v_slow
             
-        return "FAST", 0.15, self.v_fast
+        return "FAST", 0.051, self.v_fast
 
     def _calculate_dynamic_w_max(self, v_real):
         """Calcula el límite angular seguro basado en la cinemática de Ackermann."""
