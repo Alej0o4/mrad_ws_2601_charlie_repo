@@ -45,7 +45,7 @@ def generate_launch_description():
     )
 
     open_loop_odom_node = Node(
-        package='charlie_bringup',
+        package='charlie_odom',
         executable='open_loop_odom_node',
         name='open_loop_odom',
         output='screen'
