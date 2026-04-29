@@ -29,6 +29,8 @@ setup(
     entry_points={
         'console_scripts': [
             'open_loop_odom_node = charlie_bringup.open_loop_odom:main',
+            'bicycle_odom_node = charlie_odom.bicycle_odom_node:main',
+            'rf2o_odom_node = charlie_odom.RF2O_odometry:main',
         ],
     },
 )

@@ -1,0 +1,19 @@
+# Parámetros para el nodo Bicycle Odom
+# Ubicación: src/charlie_odom/charlie_odom/config/bicycle_odom_params.yaml
+
+bicycle_odom_node:
+  ros__parameters:
+    # Topics
+    rpm_topic: /esc/rpm
+    steering_topic: /servo/steering_cmd
+    odom_topic: /odom
+
+    # Frames
+    base_frame: base_link
+    odom_frame: odom
+
+    # Parámetros mecánicos y de sensor
+    wheelbase: 0.257        # distancia entre ejes (m)
+    wheel_radius: 0.053    # radio de rueda (m)
+    gear_ratio: 8.0        # relación motor->rueda
+    rpm_deadband: 50.0     # RPM mínimas para considerar movimiento
