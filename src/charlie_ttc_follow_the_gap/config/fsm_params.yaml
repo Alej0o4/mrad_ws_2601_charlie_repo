@@ -12,11 +12,11 @@ fsm_control:
 
 fsm_gap_finder:
   ros__parameters:
-    robot_width: 0.27
-    fov_angle: 0.9     # 60 grados en radianes
+    robot_width: 0.15
+    fov_angle:  1.3  ##0.8     # 60 grados en radianes
     safety_margin: 0.2
     horizon_dist: 3.5
     debug_mode: true        # NUEVO: true para ver markers en RViz, false para competencia
     # --- NUEVOS PARÁMETROS AVANZADOS ---
-    center_bias: 0.4          # 0.0 = Apuenta solo a la profundidad, 1.0 = Apunta exacto al centro del hueco
-    hysteresis_penalty: 4.0   # Factor de penalización. Si oscila mucho, sube este valor a 4.0 o 5.0
+    center_bias: 0.6        # 0.0 = Apuenta solo a la profundidad, 1.0 = Apunta exacto al centro del hueco
+    hysteresis_penalty: 4.0   # Factor de penalización. Si oscila mucho, sube este valor a 4.0 o 5.0  
