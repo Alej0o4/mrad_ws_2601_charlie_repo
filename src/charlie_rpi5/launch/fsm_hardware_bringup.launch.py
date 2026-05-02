@@ -16,7 +16,7 @@ def generate_launch_description():
     
     enable_aebs_arg = DeclareLaunchArgument(
         'enable_aebs', default_value='true',
-        description='Activar el sistema AEBS (Requiere enable_lidar:=true)'
+        description='Activar el sistema AEBS FSM (Requiere enable_lidar:=true)'
     )
 
     enable_lidar = LaunchConfiguration('enable_lidar')
@@ -38,16 +38,15 @@ def generate_launch_description():
         get_package_share_directory('yb_eb_pkg'), 'config', 'hardware_params.yaml'
     )
     
-    aebs_params_file = os.path.join(
-        get_package_share_directory('charlie_aebs'), 'config', 'parameters_aebs.yaml'
+    # [CAMBIO] Apuntamos al NUEVO archivo de parámetros que creamos
+    fsm_aebs_params_file = os.path.join(
+        get_package_share_directory('charlie_aebs'), 'config', 'fsm_parameters_aebs.yaml'
     )
 
     # Ruta al archivo launch original del fabricante del LiDAR
-    # (Ajusta 'sllidar_launch.py' si el archivo del proveedor tiene otro nombre)
     sllidar_launch_file = os.path.join(
-        get_package_share_directory('sllidar_ros2'), 'launch', 'sllidar_launch.py'
+        get_package_share_directory('sllidar_ros2'), 'launch', 'sllidar_a1_launch.py'
     )
-
 
     # --- 4. DEFINICIÓN DE NODOS Y LAUNCHES INCORPORADOS ---
 
@@ -66,22 +65,19 @@ def generate_launch_description():
     # B. LiDAR (Llamando al launch del proveedor)
     lidar_include = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(sllidar_launch_file),
-        condition=IfCondition(enable_lidar) # La condición se aplica a todo el launch externo
-        # Si el launch del proveedor necesita argumentos (ej. puerto serial), puedes pasarlos aquí:
-        # launch_arguments={'serial_port': '/dev/ttyUSB0'}.items()
+        condition=IfCondition(enable_lidar) 
     )
 
-    # C. AEBS (Con su propio archivo YAML y remapeo)
-    aebs_node = Node(
+    # C. FSM AEBS (Nuestro nuevo nodo de seguridad)
+    fsm_aebs_node = Node(
         package='charlie_aebs', 
-        executable='aebs',      
-        name='aebs_node',
+        executable='fsm_aebs_node',      # [CAMBIO] Nuevo ejecutable declarado en setup.py
+        name='fsm_aebs_node',       # [CAMBIO] Nuevo nombre del nodo
         output='screen',
         condition=IfCondition(aebs_is_active_expr), 
-        remappings=[
-            ('/diffdrive_controller/cmd_vel', '/cmd_vel_aebs')
-        ],
-        parameters=[aebs_params_file] # <--- Añadido el YAML del AEBS
+        # [CAMBIO] Eliminé el "remappings" porque en nuestro código de fsm_aebs.py 
+        # ya lo programamos para publicar directamente en '/cmd_vel_aebs'.
+        parameters=[fsm_aebs_params_file] 
     )
 
     # --- 5. RETORNO DEL LAUNCH ---
@@ -90,5 +86,5 @@ def generate_launch_description():
         enable_aebs_arg,
         twist_cmd_node,
         lidar_include,
-        aebs_node
+        fsm_aebs_node
     ])
