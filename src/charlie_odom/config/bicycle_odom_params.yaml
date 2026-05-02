@@ -1,19 +1,34 @@
 # Parámetros para el nodo Bicycle Odom
-# Ubicación: src/charlie_odom/charlie_odom/config/bicycle_odom_params.yaml
+# Ubicación: src/charlie_odom/config/bicycle_odom_params.yaml
 
 bicycle_odom_node:
   ros__parameters:
-    # Topics
-    rpm_topic: /esc/rpm
+    # ===== TOPICS =====
+    rpm_topic: /esc/speed_rpm                    # ← Cambio: antes era /esc/rpm
+    cfoc_state_topic: /esc/cfoc_state            # ← NUEVO: estado del FOC
     steering_topic: /servo/steering_cmd
     odom_topic: /odom
+    odom_valid_topic: /odom/valid                # ← NUEVO: bandera de validez
 
-    # Frames
+    # ===== FRAMES =====
     base_frame: base_link
     odom_frame: odom
 
-    # Parámetros mecánicos y de sensor
-    wheelbase: 0.257        # distancia entre ejes (m)
-    wheel_radius: 0.053    # radio de rueda (m)
-    gear_ratio: 8.0        # relación motor->rueda
-    rpm_deadband: 50.0     # RPM mínimas para considerar movimiento
+    # ===== PARÁMETROS MECÁNICOS =====
+    wheelbase: 0.257                              # distancia entre ejes (m)
+    wheel_radius: 0.053                           # radio de rueda (m)
+    gear_ratio: 3.5 #3.85                               # ← Cambio: antes 8.0 (ajustar a tu drivetrain)
+    rpm_deadband: 50.0                            # RPM mínimas para considerar movimiento
+
+    # ===== FILTRADO Y VALIDACIÓN (NUEVO) =====
+    rpm_lpf_alpha: 0.15                           # LPF para RPM ruidoso (0.0-1.0)
+                                                  # α alto → más responsive pero ruidoso
+                                                  # α bajo → más smooth pero lag
+    rpm_timeout_s: 0.2                            # timeout si no llegan RPM en segundos
+    require_closed_loop: true                     # solo publica odometría en CLOSED_LOOP
+    publish_tf: true                              # habilita/deshabilita la publicación de TF
+    
+    # ===== COVARIANZAS ADAPTATIVAS (NUEVO) =====
+    pose_cov_multiplier: 1.5                      # escala de covarianza de pose en CL
+                                                  # aumentar si EKF confía demasiado en odom
+    twist_cov_multiplier: 1.0                     # escala de covarianza de velocidad

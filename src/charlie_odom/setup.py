@@ -15,7 +15,7 @@ setup(
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml'))
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'scipy', 'numpy'],
     zip_safe=True,
     maintainer='alejo',
     maintainer_email='alejandro.marin92@eia.edu.co',
@@ -31,6 +31,7 @@ setup(
             'open_loop_odom_node = charlie_bringup.open_loop_odom:main',
             'bicycle_odom_node = charlie_odom.bicycle_odom_node:main',
             'rf2o_odom_node = charlie_odom.RF2O_odometry:main',
+            'laser_icp_node = charlie_odom.laser_icp_node:main',
         ],
     },
 )
