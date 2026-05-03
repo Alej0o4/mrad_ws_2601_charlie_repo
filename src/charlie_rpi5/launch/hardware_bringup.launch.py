@@ -34,8 +34,8 @@ def generate_launch_description():
     ])
 
     # --- 3. RUTAS DE ARCHIVOS (YAMLs y Launches externos) ---
-    hardware_params_file = os.path.join(
-        get_package_share_directory('yb_eb_pkg'), 'config', 'hardware_params.yaml'
+    external_esc_params_file = os.path.join(
+        get_package_share_directory('yb_eb_pkg'), 'config', 'external_esc_params.yaml'
     )
     
     aebs_params_file = os.path.join(
@@ -51,14 +51,14 @@ def generate_launch_description():
 
     # --- 4. DEFINICIÓN DE NODOS Y LAUNCHES INCORPORADOS ---
 
-    # A. Motores (Con remapeo dinámico)
-    twist_cmd_node = Node(
+    # A. Dirección + telemetría del hardware con ESC externa
+    external_esc_node = Node(
         package='yb_eb_pkg',
-        executable='twist_cmd_node',
-        name='twist_cmd_node_charlie',
+        executable='yb_eb_external_esc_node',
+        name='yb_eb_external_esc_node',
         output='screen',
         parameters=[
-            hardware_params_file,
+            external_esc_params_file,
             {'cmd_vel_topic': twist_cmd_topic_expr} 
         ]
     )
@@ -89,7 +89,7 @@ def generate_launch_description():
     return LaunchDescription([
         enable_lidar_arg,
         enable_aebs_arg,
-        twist_cmd_node,
+        external_esc_node,
         lidar_include,
         aebs_node
     ])

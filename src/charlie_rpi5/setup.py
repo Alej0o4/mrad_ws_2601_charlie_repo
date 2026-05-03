@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'charlie_rpi5'
 
@@ -10,6 +12,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,6 +28,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'twist_cmd_node = charlie_rpi5.yb_eb_node:main',
+            'yb_eb_external_esc_node = charlie_rpi5.yb_eb_external_esc_node:main',
         ],
     },
 )
