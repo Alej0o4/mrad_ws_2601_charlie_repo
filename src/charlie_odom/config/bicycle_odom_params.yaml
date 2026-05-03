@@ -9,6 +9,7 @@ bicycle_odom_node:
     steering_topic: /servo/steering_cmd
     odom_topic: /odom
     odom_valid_topic: /odom/valid                # ← NUEVO: bandera de validez
+    twist_topic: /odom/twist                     # ← NUEVO: twist estimado del modelo
 
     # ===== FRAMES =====
     base_frame: base_link
@@ -27,6 +28,7 @@ bicycle_odom_node:
     rpm_timeout_s: 0.2                            # timeout si no llegan RPM en segundos
     require_closed_loop: true                     # solo publica odometría en CLOSED_LOOP
     publish_tf: true                              # habilita/deshabilita la publicación de TF
+    publish_twist: true                           # habilita/deshabilita publicación de TwistStamped
     
     # ===== COVARIANZAS ADAPTATIVAS (NUEVO) =====
     pose_cov_multiplier: 1.5                      # escala de covarianza de pose en CL

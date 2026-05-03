@@ -7,7 +7,7 @@ import threading
 from collections import deque
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import TransformStamped, Quaternion
+from geometry_msgs.msg import TransformStamped, Quaternion, TwistStamped
 from tf2_ros import TransformBroadcaster
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float32, Bool, String,Int16
@@ -39,6 +39,7 @@ class BicycleOdomNode(Node):
         self.declare_parameter('steering_topic', '/servo/steering_cmd')
         self.declare_parameter('odom_topic', '/odom')
         self.declare_parameter('odom_valid_topic', '/odom/valid')    # ← NUEVO
+        self.declare_parameter('twist_topic', '/odom/twist')
         self.declare_parameter('base_frame', 'base_link')
         self.declare_parameter('odom_frame', 'odom')
         
@@ -53,6 +54,7 @@ class BicycleOdomNode(Node):
         self.declare_parameter('rpm_timeout_s', 0.2)      # timeout si no llegan RPM
         self.declare_parameter('require_closed_loop', True) # solo publica en CL
         self.declare_parameter('publish_tf', True)        # habilita/deshabilita la publicación de TF
+        self.declare_parameter('publish_twist', True)     # habilita/deshabilita la publicación de TwistStamped
         self.declare_parameter('pose_cov_multiplier', 1.0) # escala dinámica de covarianza
         self.declare_parameter('twist_cov_multiplier', 1.0)
 
@@ -62,6 +64,7 @@ class BicycleOdomNode(Node):
         self.steering_topic = self.get_parameter('steering_topic').value
         self.odom_topic = self.get_parameter('odom_topic').value
         self.odom_valid_topic = self.get_parameter('odom_valid_topic').value
+        self.twist_topic = self.get_parameter('twist_topic').value
         self.base_frame = self.get_parameter('base_frame').value
         self.odom_frame = self.get_parameter('odom_frame').value
         
@@ -74,6 +77,7 @@ class BicycleOdomNode(Node):
         self.rpm_timeout_s = self.get_parameter('rpm_timeout_s').value
         self.require_closed_loop = self.get_parameter('require_closed_loop').value
         self.publish_tf = self.get_parameter('publish_tf').value
+        self.publish_twist = self.get_parameter('publish_twist').value
         self.pose_cov_mult = self.get_parameter('pose_cov_multiplier').value
         self.twist_cov_mult = self.get_parameter('twist_cov_multiplier').value
 
@@ -97,6 +101,7 @@ class BicycleOdomNode(Node):
         # --- Publicadores ---
         self.odom_publisher = self.create_publisher(Odometry, self.odom_topic, 10)
         self.odom_valid_publisher = self.create_publisher(Bool, self.odom_valid_topic, 10)  # ← NUEVO
+        self.twist_publisher = self.create_publisher(TwistStamped, self.twist_topic, 10)
         self.joint_publisher = self.create_publisher(JointState, '/joint_states', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
@@ -258,6 +263,8 @@ class BicycleOdomNode(Node):
             if self.publish_tf:
                 self._publish_tf(current_time)
             self._publish_odometry(current_time, v_pub, w_pub, publish_odom)
+            if self.publish_twist:
+                self._publish_twist(current_time, v_pub, w_pub)
             self._publish_joint_states(current_time)
 
     def _publish_tf(self, timestamp):
@@ -318,6 +325,19 @@ class BicycleOdomNode(Node):
         odom_msg.twist.covariance = twist_cov
 
         self.odom_publisher.publish(odom_msg)
+
+    def _publish_twist(self, timestamp, v, w):
+        """Publicar la velocidad estimada por el modelo cinemático."""
+        twist_msg = TwistStamped()
+        twist_msg.header.stamp = timestamp.to_msg()
+        twist_msg.header.frame_id = self.base_frame
+        twist_msg.twist.linear.x = v
+        twist_msg.twist.linear.y = 0.0
+        twist_msg.twist.linear.z = 0.0
+        twist_msg.twist.angular.x = 0.0
+        twist_msg.twist.angular.y = 0.0
+        twist_msg.twist.angular.z = w
+        self.twist_publisher.publish(twist_msg)
 
     def _publish_joint_states(self, timestamp):
         """Publicar estados de articulaciones para visualización en RViz."""
