@@ -16,6 +16,7 @@ def generate_launch_description():
     bringup_pkg_name = "charlie_bringup"
     description_pkg_name = "charlie_description"
     aebs_pkg_name = "charlie_aebs"
+    odom_pkg_name = "charlie_odom"
 
     robot_name = "ackermann_urdf"
     use_sim_time = LaunchConfiguration("use_sim_time")
@@ -88,6 +89,28 @@ def generate_launch_description():
         output='screen'
     )
 
+    bicycle_parms = os.path.join(get_package_share_directory(odom_pkg_name),'config','bicycle_odom_params.yaml')
+
+    # Odometría con modelo bicycle y sin corrección de deriva
+    bicycle_odom = Node(
+        package='charlie_odom',
+        executable='bicycle_odom_node',
+        name='bicycle_odom',
+        parameters=[bicycle_parms,{'use_sim_time': False}],
+        output='screen'
+    )
+
+    laser_odom_params = os.path.join(get_package_share_directory(odom_pkg_name),'config','laser_icp_params.yaml')
+
+    # Odometría con LiDAR
+    lidar_odom = Node(
+        package='charlie_odom',
+        executable='laser_icp_odom_node',
+        name='lidar_odom',
+        parameters=[laser_odom_params,{'use_sim_time': False}],
+        output='screen'
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -101,7 +124,9 @@ def generate_launch_description():
             teleop_node,
             twist_mux_node,
             lidar_node,
-            open_loop_odom_node
+            # open_loop_odom_node,
+            # bicycle_odom,
+            # lidar_odom,
 
         ]
     )
