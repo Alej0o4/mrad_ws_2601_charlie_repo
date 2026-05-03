@@ -1,6 +1,6 @@
 laser_icp_node:
   ros__parameters:
-    scan_topic: /scan
+    scan_topic: /scan_filtered
     motion_prior_topic: /odom
     odom_topic: /odom_laser
     valid_topic: /odom_laser/valid
@@ -14,7 +14,7 @@ laser_icp_node:
     publish_tf: false
     publish_twist: true
     use_motion_seed: true
-    update_rate_hz: 30.0
+    update_rate_hz: 10.0
     process_every_n_scans: 1
     scan_timeout_s: 0.5
     crop_min_angle: -3.141592653589793
