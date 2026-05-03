@@ -13,7 +13,7 @@ def generate_launch_description():
     default_yaml_path = os.path.join(
         get_package_share_directory(pkg_name),
         'config',
-        'session_a_steps.yaml'
+        'session_general.yaml'
     )
 
     # 3. Declaramos el argumento de consola
