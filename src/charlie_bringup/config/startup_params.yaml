@@ -1,0 +1,27 @@
+startup_node:
+  ros__parameters:
+    # ===== CONTROL PARAMETERS =====
+    # Button index from Joy message (0=A, 1=B, 2=X, 3=Y, 4=LB, 5=RB, ...)
+    joy_button_idx: 0
+    
+    # Security mode:
+    # true  = button must be held throughout entire startup sequence (safer)
+    # false = single press sufficient, continues to CLOSED_LOOP regardless (convenient)
+    hold_button_required: true
+    
+    # Fixed linear velocity command during startup (m/s, forward only)
+    startup_cmd_value: 0.15
+    
+    # Timeout for startup sequence (seconds)
+    # If CLOSED_LOOP not reached within this time, startup aborts
+    startup_timeout_s: 6.0
+    
+    # ===== TOPIC CONFIGURATION =====
+    joy_topic: '/joy'
+    cfoc_state_topic: '/esc/cfoc_state'
+    cmd_vel_topic: '/cmd_vel_start'
+    
+    # ===== PUBLISH RATE =====
+    # Frequency at which commands are published (Hz)
+    # Empirically found that 20 Hz is sufficient for motor startup
+    publish_hz: 20

@@ -11,8 +11,12 @@ twist_mux:
         topic   : cmd_vel_joy
         timeout : 0.5
         priority: 120
+      startup:
+        topic   : cmd_vel_start
+        timeout : 0.5
+        priority: 125  # HIGHEST PRIORITY - startup must override all other inputs
       keyboard  : 
-        topic   : cmd_vel_key
+        topic   : cmd_vel_keyboard
         timeout : 0.5
         priority: 50
       wall_following:
