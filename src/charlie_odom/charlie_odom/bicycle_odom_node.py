@@ -46,7 +46,7 @@ class BicycleOdomNode(Node):
         # Parámetros Mecánicos
         self.declare_parameter('wheelbase', 0.257) 
         self.declare_parameter('wheel_radius', 0.053)
-        self.declare_parameter('gear_ratio', 3.5)
+        self.declare_parameter('gear_ratio', 9.6)
         self.declare_parameter('rpm_deadband', 50.0)
         
         # ← NUEVOS: Filtrado y validación
@@ -150,11 +150,9 @@ class BicycleOdomNode(Node):
             self.cfoc_state = msg.data
             # Transición a CL: valida odom
             if msg.data == 'CLOSED_LOOP' and self.cfoc_state != 'CLOSED_LOOP':
-                self.odom_valid = True
                 self.get_logger().info('→ CFOC entered CLOSED_LOOP. Odom validity ON.')
             # Salida de CL: invalida odom
             elif msg.data != 'CLOSED_LOOP' and self.cfoc_state == 'CLOSED_LOOP':
-                self.odom_valid = False
                 self.get_logger().warn(f'← CFOC left CLOSED_LOOP → {msg.data}. Odom validity OFF.')
 
     def _rpm_callback(self, msg):
@@ -235,17 +233,19 @@ class BicycleOdomNode(Node):
     def _publish_loop(self):
         """Loop de publicación @ 50 Hz."""
         current_time = self.get_clock().now()
-
         with self._lock:
-            # Timeout de seguridad: si no llegan RPM en rpm_timeout_s, marcar inválida
+            # 1. Evaluar frescura de RPM
             dt_since_rpm = (current_time - self.last_rpm_time).nanoseconds / 1e9
-            if dt_since_rpm > self.rpm_timeout_s:
-                self.odom_valid = False
-                if dt_since_rpm > self.rpm_timeout_s + 0.1:  # log cada 100ms
-                    self.get_logger().debug(f"RPM timeout: {dt_since_rpm:.2f}s > {self.rpm_timeout_s}s")
+            is_rpm_fresh = dt_since_rpm <= self.rpm_timeout_s
 
-            # Validar si debe publicar odometría
-            publish_odom = self.odom_valid and (not self.require_closed_loop or self.cfoc_state == 'CLOSED_LOOP')
+            if not is_rpm_fresh and dt_since_rpm > self.rpm_timeout_s + 0.1:
+                self.get_logger().debug(f"RPM timeout: {dt_since_rpm:.2f}s > {self.rpm_timeout_s}s")
+
+            # 2. Evaluar condición de lazo cerrado
+            is_closed_loop = (self.cfoc_state == 'CLOSED_LOOP') or not self.require_closed_loop
+
+            # 3. La odometría es válida SI los datos son frescos Y cumple la condición del ESC
+            publish_odom = is_rpm_fresh and is_closed_loop
 
             # Publicar bandera de validez
             valid_msg = Bool(data=publish_odom)

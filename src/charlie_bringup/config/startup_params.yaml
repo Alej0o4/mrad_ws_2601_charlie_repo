@@ -1,5 +1,8 @@
 startup_node:
   ros__parameters:
+    # Use wall-clock time on real hardware
+    use_sim_time: false
+
     # ===== CONTROL PARAMETERS =====
     # Button index from Joy message (0=A, 1=B, 2=X, 3=Y, 4=LB, 5=RB, ...)
     joy_button_idx: 0

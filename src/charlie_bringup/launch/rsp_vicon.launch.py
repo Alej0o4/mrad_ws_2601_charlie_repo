@@ -95,7 +95,7 @@ def generate_launch_description():
     bicycle_odom = Node(
         package='charlie_odom',
         executable='bicycle_odom_node',
-        name='bicycle_odom',
+        name='bicycle_odom_node',
         parameters=[bicycle_parms,{'use_sim_time': False}],
         output='screen'
     )
@@ -103,10 +103,10 @@ def generate_launch_description():
     laser_odom_params = os.path.join(get_package_share_directory(odom_pkg_name),'config','laser_icp_params.yaml')
 
     # Odometría con LiDAR
-    lidar_odom = Node(
+    laser_icp_node = Node(
         package='charlie_odom',
-        executable='laser_icp_odom_node',
-        name='lidar_odom',
+        executable='laser_icp_node',
+        name='laser_icp_node',
         parameters=[laser_odom_params,{'use_sim_time': False}],
         output='screen'
     )
@@ -126,7 +126,7 @@ def generate_launch_description():
             lidar_node,
             # open_loop_odom_node,
             # bicycle_odom,
-            # lidar_odom,
+            laser_icp_node,
 
         ]
     )

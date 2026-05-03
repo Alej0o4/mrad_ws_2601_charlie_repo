@@ -18,19 +18,17 @@ bicycle_odom_node:
     # ===== PARÁMETROS MECÁNICOS =====
     wheelbase: 0.257                              # distancia entre ejes (m)
     wheel_radius: 0.053                           # radio de rueda (m)
-    gear_ratio: 3.5 #3.85                               # ← Cambio: antes 8.0 (ajustar a tu drivetrain)
-    rpm_deadband: 50.0                            # RPM mínimas para considerar movimiento
+    gear_ratio: 9.6 #3.85                               # ← Cambio: antes 8.0 (ajustar a tu drivetrain)
+    rpm_deadband: 100.0                            # RPM mínimas para considerar movimiento
 
     # ===== FILTRADO Y VALIDACIÓN (NUEVO) =====
-    rpm_lpf_alpha: 0.15                           # LPF para RPM ruidoso (0.0-1.0)
-                                                  # α alto → más responsive pero ruidoso
-                                                  # α bajo → más smooth pero lag
+    rpm_lpf_alpha: 0.15                           # LPF para RPM ruidoso (0.0-1.0) # α alto → más responsive pero ruidos # α bajo → más smooth pero lag
+
     rpm_timeout_s: 0.2                            # timeout si no llegan RPM en segundos
-    require_closed_loop: true                     # solo publica odometría en CLOSED_LOOP
+    require_closed_loop: false                     # solo publica odometría en CLOSED_LOOP
     publish_tf: true                              # habilita/deshabilita la publicación de TF
     publish_twist: true                           # habilita/deshabilita publicación de TwistStamped
     
     # ===== COVARIANZAS ADAPTATIVAS (NUEVO) =====
-    pose_cov_multiplier: 1.5                      # escala de covarianza de pose en CL
-                                                  # aumentar si EKF confía demasiado en odom
+    pose_cov_multiplier: 1.5                      # escala de covarianza de pose en CL # aumentar si EKF confía demasiado en odom
     twist_cov_multiplier: 1.0                     # escala de covarianza de velocidad

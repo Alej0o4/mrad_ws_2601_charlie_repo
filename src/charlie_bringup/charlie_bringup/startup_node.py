@@ -73,6 +73,7 @@ class StartupNode(Node):
         self.cfoc_state = "IDLE"
         self.startup_start_time = None
         self.last_button_state = False
+        self._last_publish_log_time = 0.0
         
         # ===== PUBLISHERS & SUBSCRIBERS =====
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_vel_topic, 10)
@@ -114,10 +115,14 @@ class StartupNode(Node):
         
         # Detect rising edge (button press)
         if button_is_pressed and not self.last_button_state:
-            self.get_logger().info(f"Button {self.joy_button_idx} pressed - Starting motor startup")
-            if self.current_state == self.STATE_IDLE:
+            if self.current_state in [self.STATE_IDLE, self.STATE_ABORTED, self.STATE_STARTED]:
+                self.get_logger().info(f"Button {self.joy_button_idx} pressed - Starting motor startup")
                 self.current_state = self.STATE_STARTING
                 self.startup_start_time = time.time()
+            elif self.current_state == self.STATE_STARTING:
+                self.get_logger().info(
+                    f"Button {self.joy_button_idx} pressed, startup already running"
+                )
         
         # Handle button release
         elif not button_is_pressed and self.last_button_state:
@@ -187,6 +192,15 @@ class StartupNode(Node):
             msg.twist.angular.z = 0.0
             
             self.cmd_pub.publish(msg)
+
+            # Periodic visibility log to confirm active publishing
+            now = time.time()
+            if now - self._last_publish_log_time > 1.0:
+                self.get_logger().info(
+                    f"Publishing startup command on {self.cmd_vel_topic}: "
+                    f"linear.x={self.startup_cmd_value:.3f}"
+                )
+                self._last_publish_log_time = now
     
     def _send_stop_command(self):
         """

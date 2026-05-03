@@ -11,7 +11,7 @@ laser_icp_node:
     # ===== OFFSETS DEL SENSOR (brazo de palanca) =====
     lidar_offset_x: 0.0                          # Distancia X del LiDAR respecto a base_link (m)
     lidar_offset_y: 0.0                          # Distancia Y del LiDAR respecto a base_link (m)
-    publish_tf: false
+    publish_tf: true
     publish_twist: true
     use_motion_seed: true
     update_rate_hz: 10.0
