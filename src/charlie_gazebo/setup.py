@@ -19,6 +19,8 @@ setup(
         (os.path.join('share', package_name,'plot_juggler'), glob('plot_juggler/*.*')),
         (os.path.join('share', package_name,'maps'), glob('maps/*.*')),
         (os.path.join('share', package_name,'slam_data'), glob('slam_data/*.*')),
+        (os.path.join('share', package_name,'real_maps'), glob('real_maps/*.*')),
+        (os.path.join('share', package_name,'real_slam_data'), glob('real_slam_data/*.*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
