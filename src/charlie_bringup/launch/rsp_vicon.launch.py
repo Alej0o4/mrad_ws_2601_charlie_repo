@@ -125,8 +125,8 @@ def generate_launch_description():
             twist_mux_node,
             lidar_node,
             # open_loop_odom_node,
-            # bicycle_odom,
-            laser_icp_node,
+            bicycle_odom,
+            # laser_icp_node,
 
         ]
     )

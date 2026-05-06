@@ -11,10 +11,10 @@ yb_eb_external_esc_node:
     min_linear_speed_for_delta: 0.05
 
     steering:
-      ANGLE_MAX: 0.349
+      ANGLE_MAX: 0.31083
       LIMIT_PERCENT: 1.0
-      PWM_MIN: 50.0
-      PWM_MAX: 130.0
+      PWM_MIN: 70.0
+      PWM_MAX: 110.0
       PWM_CENTER: 90.0
       SERVO_CHANNEL: 2
 
