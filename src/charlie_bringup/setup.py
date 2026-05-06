@@ -33,6 +33,7 @@ setup(
             'scan_inverter_node = charlie_bringup.lidar_node:main',
             'open_loop_odom_node = charlie_bringup.open_loop_odom:main',
             'startup_node = charlie_bringup.startup_node:main',
+            'imu_processor_node = charlie_bringup.imu_node:main',
         ],
     },
 )
