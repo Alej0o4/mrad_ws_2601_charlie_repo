@@ -30,7 +30,6 @@ class YbEbExternalEscNode(Node):
         self.declare_parameter('wheelbase', 0.257)
         self.declare_parameter('min_linear_speed_for_delta', 0.05)
 
-        self.declare_parameter('steering.ANGLE_MAX', 1.0)
         self.declare_parameter('steering.LIMIT_PERCENT', 1.0)
         self.declare_parameter('steering.PWM_MIN', 50.0)
         self.declare_parameter('steering.PWM_MAX', 130.0)
@@ -45,6 +44,14 @@ class YbEbExternalEscNode(Node):
 
         self.declare_parameter('min_battery_voltage', 11.7)
 
+        # --- Calibration parameters for mapping normalized cmd to physical speed ---
+        self.declare_parameter('deadzone_threshold', 0.1)
+        self.declare_parameter('cmd_min', 0.1)
+        self.declare_parameter('cmd_max', 0.2)
+        self.declare_parameter('speed_min_ms', 1.3)
+        self.declare_parameter('speed_max_ms', 1.4)
+        # Default max steering angle (rad). Adjust to your servo maximum if known.
+        self.declare_parameter('max_steer_angle_rad', 1.0)
         # --- Parameter values ---
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         self.steering_cmd_topic = self.get_parameter('steering_cmd_topic').value
@@ -56,7 +63,6 @@ class YbEbExternalEscNode(Node):
         self.wheelbase = float(self.get_parameter('wheelbase').value)
         self.min_linear_speed_for_delta = float(self.get_parameter('min_linear_speed_for_delta').value)
 
-        self.steering_angle_max = float(self.get_parameter('steering.ANGLE_MAX').value)
         self.steering_limit_percent = float(self.get_parameter('steering.LIMIT_PERCENT').value)
         self.steering_pwm_min = float(self.get_parameter('steering.PWM_MIN').value)
         self.steering_pwm_max = float(self.get_parameter('steering.PWM_MAX').value)
@@ -71,6 +77,13 @@ class YbEbExternalEscNode(Node):
 
         self.min_battery_voltage = float(self.get_parameter('min_battery_voltage').value)
 
+        # Calibration parameter values
+        self.deadzone_threshold = float(self.get_parameter('deadzone_threshold').value)
+        self.cmd_min = float(self.get_parameter('cmd_min').value)
+        self.cmd_max = float(self.get_parameter('cmd_max').value)
+        self.speed_min_ms = float(self.get_parameter('speed_min_ms').value)
+        self.speed_max_ms = float(self.get_parameter('speed_max_ms').value)
+        self.max_steer_angle_rad = float(self.get_parameter('max_steer_angle_rad').value)
         # --- QoS ---
         sensor_qos = qos_profile_sensor_data
 
@@ -94,6 +107,7 @@ class YbEbExternalEscNode(Node):
 
         # --- Internal state ---
         self.cmd_vel_msg = TwistStamped()
+        self.target_physical_velocity = 0.0
         self._closed_loop_buzzed = False
         self._last_esc_state = 'unknown'
 
@@ -103,12 +117,41 @@ class YbEbExternalEscNode(Node):
             f'  steering_cmd_topic: {self.steering_cmd_topic}\n'
             f'  esc_state_topic: {self.esc_state_topic}\n'
             f'  wheelbase: {self.wheelbase:.3f} m\n'
-            f'  steering limit: {self.steering_angle_max * self.steering_limit_percent:.3f} rad\n'
+                f'  steering limit: {self.max_steer_angle_rad * self.steering_limit_percent:.3f} rad\n'
             f'  buzzer enabled: {self.buzzer_enabled}'
         )
 
     def _cmd_vel_callback(self, msg: TwistStamped):
+        # Keep the full message (for angular.z) but compute a physical velocity
         self.cmd_vel_msg = msg
+
+        raw_cmd = float(msg.twist.linear.x)
+        sign = math.copysign(1.0, raw_cmd) if raw_cmd != 0.0 else 1.0
+        abs_cmd = abs(raw_cmd)
+
+        # Deadzone
+        if abs_cmd < self.deadzone_threshold:
+            self.target_physical_velocity = 0.0
+        else:
+            # Guard against misconfiguration
+            if self.cmd_max == self.cmd_min:
+                self.get_logger().warn('cmd_max equals cmd_min; saturating to speed_max_ms')
+                mapped = self.speed_max_ms
+            else:
+                if abs_cmd <= self.cmd_min:
+                    mapped = self.speed_min_ms
+                elif abs_cmd >= self.cmd_max:
+                    mapped = self.speed_max_ms
+                else:
+                    # Linear interpolation between speed_min_ms and speed_max_ms
+                    mapped = (
+                        self.speed_min_ms
+                        + ((self.speed_max_ms - self.speed_min_ms) / (self.cmd_max - self.cmd_min))
+                        * (abs_cmd - self.cmd_min)
+                    )
+
+            self.target_physical_velocity = mapped * sign
+
         self._update_and_publish_steering()
 
     def _esc_state_callback(self, msg: String):
@@ -170,7 +213,7 @@ class YbEbExternalEscNode(Node):
         self.voltage_pub.publish(battery_msg)
 
     def _update_and_publish_steering(self):
-        v = float(self.cmd_vel_msg.twist.linear.x)
+        v = float(self.target_physical_velocity)
         omega = float(self.cmd_vel_msg.twist.angular.z)
 
         delta_efectivo = self._cmd_to_delta(v, omega)
@@ -184,19 +227,26 @@ class YbEbExternalEscNode(Node):
         self.steering_cmd_pub.publish(steering_msg)
 
     def _cmd_to_delta(self, v: float, omega: float) -> float:
-        max_allowed_angle = self.steering_angle_max * self.steering_limit_percent
+        # Use the configured maximum steer angle but don't exceed previously
+        # configured steering limits.
+        max_allowed_angle = min(self.max_steer_angle_rad, self.max_steer_angle_rad * self.steering_limit_percent)
 
-        if abs(v) < self.min_linear_speed_for_delta:
-            v = math.copysign(self.min_linear_speed_for_delta, v if v != 0.0 else 1.0)
+        # If we have zero physical forward/backward speed, avoid division by zero
+        # and directly apply a max steer angle proportional to the sign of omega.
+        if abs(v) == 0.0:
+            if abs(omega) > 0.0:
+                return math.copysign(max_allowed_angle, omega)
+            return 0.0
 
         delta = math.atan((omega * self.wheelbase) / v)
         return max(-max_allowed_angle, min(delta, max_allowed_angle))
 
     def _delta_to_pwm(self, delta: float) -> float:
+        effective_angle = self.max_steer_angle_rad * self.steering_limit_percent
         return self._map_and_clamp(
             delta,
-            -self.steering_angle_max,
-            self.steering_angle_max,
+            -effective_angle,
+            effective_angle,
             self.steering_pwm_min,
             self.steering_pwm_max,
         )
