@@ -10,8 +10,16 @@ yb_eb_external_esc_node:
     wheelbase: 0.257
     min_linear_speed_for_delta: 0.05
 
+    # Calibration parameters mapping normalized cmd to physical speed
+    deadzone_threshold: 0.1
+    cmd_min: 0.1
+    cmd_max: 0.2
+    speed_min_ms: 1.3
+    speed_max_ms: 1.4
+    # Max steering angle based on servo mechanical range [-20°, 20°] -> ~0.349066 rad
+    max_steer_angle_rad: 0.349066
+
     steering:
-      ANGLE_MAX: 0.31083
       LIMIT_PERCENT: 1.0
       PWM_MIN: 70.0
       PWM_MAX: 110.0
