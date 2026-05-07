@@ -8,7 +8,7 @@ import tf2_ros
 from tf2_ros import TransformException
 
 # Necesitarás instalar o incluir la librería MadgwickAHRS que menciona tu profe
-from charlie_bringup.madgwic_filter import MadgwickAHRS # (pip install ahrs)
+from charlie_odom.madgwic_filter import MadgwickAHRS # (pip install ahrs)
 
 def _quat_to_rot(x, y, z, w) -> np.ndarray:
     return np.array([

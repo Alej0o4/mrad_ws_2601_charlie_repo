@@ -33,6 +33,7 @@ setup(
             'rf2o_odom_node = charlie_odom.RF2O_odometry:main',
             'laser_icp_node = charlie_odom.laser_icp_node:main',
             'imuBicycle_odom_node = charlie_odom.imuBicycle_odom_node:main',
+            'imu_processor_node = charlie_odom.Imu_node:main'
         ],
     },
 )

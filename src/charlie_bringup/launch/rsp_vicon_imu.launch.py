@@ -109,7 +109,7 @@ def generate_launch_description():
     )
 
     imu_processor_node = Node(
-        package='charlie_bringup', # Ajusta el paquete si lo guardaste en otro lado
+        package='charlie_odom', # Ajusta el paquete si lo guardaste en otro lado
         executable='imu_processor_node', 
         name='imu_processor_node',
         output='screen'
