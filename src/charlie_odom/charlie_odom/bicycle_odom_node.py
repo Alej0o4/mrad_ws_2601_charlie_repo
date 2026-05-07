@@ -311,9 +311,13 @@ class BicycleOdomNode(Node):
             # Inválida: covarianzas muy altas (desconfia el EKF)
             pose_cov_base = [1.0, 1.0, 1.0]
             twist_cov_base = [1.0, 1.0, 1.0]
-            mult = 10.0  # Force alta incertidumbre
+            mult = 1.0  # Force alta incertidumbre
 
         pose_cov = [0.0] * 36
+
+        for i in (0, 7, 14, 21, 28, 35):
+            pose_cov[i] = 1e-9
+
         pose_cov[0]  = pose_cov_base[0] * mult  # x
         pose_cov[7]  = pose_cov_base[1] * mult  # y
         pose_cov[35] = pose_cov_base[2] * mult  # yaw
