@@ -17,7 +17,7 @@ yb_eb_external_esc_node:
     speed_min_ms: 1.3
     speed_max_ms: 1.4
     # Max steering angle based on servo mechanical range [-20°, 20°] -> ~0.349066 rad
-    max_steer_angle_rad: 0.349066
+    max_steer_angle_rad: 0.249066
 
     steering:
       LIMIT_PERCENT: 1.0

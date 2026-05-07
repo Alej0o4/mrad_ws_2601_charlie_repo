@@ -110,8 +110,8 @@ def generate_launch_description():
 
     imu_processor_node = Node(
         package='charlie_bringup', # Ajusta el paquete si lo guardaste en otro lado
-        executable='imu_node.py', 
-        name='imu_node.py',
+        executable='imu_processor_node', 
+        name='imu_processor_node',
         output='screen'
     )
 
@@ -141,6 +141,7 @@ def generate_launch_description():
             lidar_node,
             # open_loop_odom_node,
             #bicycle_odom,
+            imu_processor_node,
             imuBicycle_odom_node,
             # laser_icp_node,
 

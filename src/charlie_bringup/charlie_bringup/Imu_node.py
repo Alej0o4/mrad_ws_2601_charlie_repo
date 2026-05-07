@@ -8,7 +8,7 @@ import tf2_ros
 from tf2_ros import TransformException
 
 # Necesitarás instalar o incluir la librería MadgwickAHRS que menciona tu profe
-from ahrs.filters import Madgwick # (pip install ahrs)
+from charlie_bringup.madgwic_filter import MadgwickAHRS # (pip install ahrs)
 
 def _quat_to_rot(x, y, z, w) -> np.ndarray:
     return np.array([
@@ -27,7 +27,7 @@ class ImuProcessorNode(Node):
         self._R_imu_to_base = None
 
         # Filtro Madgwick
-        self.ahrs = Madgwick(sample_period=0.02, beta=0.1)
+        self.ahrs = MadgwickAHRS(sample_period=0.02, beta=0.1)
         self.q = np.array([1.0, 0.0, 0.0, 0.0]) # w, x, y, z
 
         # Suscriptor al IMU crudo de Yahboom
@@ -63,7 +63,7 @@ class ImuProcessorNode(Node):
 
         # 3. Pasar por Madgwick
         # Nota: Si tu placa no tiene magnetómetro, pasamos None
-        self.q = self.ahrs.updateIMU(self.q, gyr=gyro_corrected, acc=accel_for_ahrs)
+        self.q = self.ahrs.update(self.q, gyr=gyro_corrected, acc=accel_for_ahrs)
 
         # 4. Publicar la IMU corregida
         out_msg = Imu()
