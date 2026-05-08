@@ -85,7 +85,7 @@ def generate_launch_description():
         package='charlie_odom', # Ajusta el paquete si lo guardaste en otro lado
         executable='imu_processor_node', 
         name='imu_processor_node',
-        output='screen'
+        output='screen',
         parameters=[imu_parms, {'use_sim_time': False}] 
     )
 
