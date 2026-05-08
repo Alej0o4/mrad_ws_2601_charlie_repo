@@ -1,0 +1,24 @@
+pure_pursuit_ackermann_node:
+  ros__parameters:
+    # Ajustes físicos
+    wheelbase: 0.33               
+    max_steering_angle: 0.52      
+
+    # Tópicos
+    path_topic: "/current_active_path"
+    cmd_vel_topic: "/cmd_vel_nav"
+    base_frame: "base_link"
+
+    # Velocidad
+    v_nominal: 1.5                
+    max_speed: 2.5                
+
+    # Lookahead adaptativo (¡Afinar en pista!)
+    lookahead_L0: 0.6             
+    lookahead_kv: 0.2             
+    lookahead_min: 0.4            
+    lookahead_max: 2.5            
+
+    # Rendimiento
+    control_rate_hz: 50.0         
+    goal_tolerance: 0.3
