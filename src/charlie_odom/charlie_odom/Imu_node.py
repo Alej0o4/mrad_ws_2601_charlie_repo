@@ -142,7 +142,7 @@ class ImuProcessorNode(Node):
         # --- PUBLICAR IMU CORREGIDA EN imu_link ---
         out_msg = Imu()
         out_msg.header = msg.header  # Preservar timestamp y frame_id
-        out_msg.header.frame_id = 'imu_link'  # Mantener en frame original
+        out_msg.header.frame_id = 'base_link'  # Mantener en frame original
         
         # Giroscopio corregido
         out_msg.angular_velocity.x = gyro_corrected[0]
