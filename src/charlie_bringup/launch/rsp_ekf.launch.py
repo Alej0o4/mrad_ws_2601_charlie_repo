@@ -79,11 +79,14 @@ def generate_launch_description():
         output='screen'
     )
 
+    imu_parms = os.path.join(get_package_share_directory(odom_pkg_name),'config','imu_node_params.yaml')
+
     imu_processor_node = Node(
         package='charlie_odom', # Ajusta el paquete si lo guardaste en otro lado
         executable='imu_processor_node', 
         name='imu_processor_node',
         output='screen'
+        parameters=[imu_parms, {'use_sim_time': False}] 
     )
 
     ekf_config_path = os.path.join(get_package_share_directory(odom_pkg_name), 'config', 'ekf_robot_localization.yaml')
