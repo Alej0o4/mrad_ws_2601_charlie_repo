@@ -62,7 +62,7 @@ class ARAPlannerNode(Node):
         self.declare_parameter('geometry.occupied_threshold', 65)
         self.declare_parameter('geometry.use_8_connected', True)
         self.declare_parameter('geometry.inflate_radius', 0.15)
-        self.declare_parameter('geometry.treat_unknown_as_obstacle', True)
+        self.declare_parameter('geometry.treat_unknown_as_obstacle', False)
 
         # --- Parámetros NUEVOS para ARA* ---
         self.declare_parameter('ara_core.epsilon_start', 2.5)       # Inflación inicial (Modo rápido)

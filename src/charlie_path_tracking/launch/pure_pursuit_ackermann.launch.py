@@ -15,7 +15,7 @@ def generate_launch_description():
     pure_pursuit_node = Node(
         package='charlie_path_tracking',
         executable='pure_pursuit_ackermann',
-        name='pure_pursuit_ackermann_node',
+        name='pure_pursuit_ackermann',
         output='screen',
         parameters=[config_dir]
     )
