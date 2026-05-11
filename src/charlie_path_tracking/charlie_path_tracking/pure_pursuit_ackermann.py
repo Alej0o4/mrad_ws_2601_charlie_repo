@@ -40,13 +40,13 @@ class AckermannPurePursuitNode(Node):
         self.declare_parameter("base_frame", "base_link")
 
         # ---- Hardware de Charlie
-        self.declare_parameter("wheelbase", 0.33)          # [m] Distancia entre ejes
-        self.declare_parameter("max_steering_angle", 0.52) # [rad] ~30 grados máximos del servo
+        self.declare_parameter("wheelbase", 0.257)          # [m] Distancia entre ejes
+        self.declare_parameter("max_steering_angle", 0.349) # [rad] ~20 grados máximos del servo
 
         # ---- Desempeño
-        self.declare_parameter("control_rate_hz", 50.0)    # [Hz] Tasa de actualización rápida para carrera
-        self.declare_parameter("v_nominal", 1.5)           # [m/s] Velocidad de carrera
-        self.declare_parameter("max_speed", 2.5)
+        self.declare_parameter("control_rate_hz", 10.0)    # [Hz] Tasa de actualización rápida para carrera
+        self.declare_parameter("v_nominal", 0.15)           # [m/s] Velocidad de carrera
+        self.declare_parameter("max_speed", 0.2)
         self.declare_parameter("goal_tolerance", 0.3)
 
         # ---- Lookahead Dinámico (Punto de mira)
