@@ -13,6 +13,7 @@ from nav_msgs.msg import Path
 import tf2_ros
 from tf2_ros import TransformException
 from tf2_geometry_msgs import do_transform_pose_stamped
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy
 
 def clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
@@ -28,7 +29,7 @@ class PurePursuitNode(Node):
         super().__init__("pure_pursuit_node")
 
         # ---- Parámetros de Tópicos
-        self.declare_parameter("path_topic", "/current_active_path")
+        self.declare_parameter("path_topic", "/planned_path")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_nav")
         self.declare_parameter("base_frame", "base_link")
 
@@ -37,7 +38,7 @@ class PurePursuitNode(Node):
         self.declare_parameter("v_nominal", 0.15)
         self.declare_parameter("max_speed", 0.2)
         self.declare_parameter("max_omega", 1.8)           # Límite de velocidad angular [rad/s]
-        self.declare_parameter("goal_tolerance", 0.3)
+        self.declare_parameter("goal_tolerance", 0.1)
 
         # ---- Parámetros de Lookahead
         self.declare_parameter("lookahead_L0", 0.6)
@@ -63,6 +64,13 @@ class PurePursuitNode(Node):
         self.goal_tol = self.get_parameter("goal_tolerance").value
         self.eps = self.get_parameter("eps").value
         self.tf_timeout = self.get_parameter("tf_timeout_sec").value
+
+        # -- QoS
+        latched_qos = QoSProfile(
+            depth=1,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            history=QoSHistoryPolicy.KEEP_LAST
+        )
 
         # ---- ROS 2 Interfaces
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_topic, 10)
