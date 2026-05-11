@@ -33,10 +33,10 @@ class PurePursuitNode(Node):
         self.declare_parameter("base_frame", "base_link")
 
         # ---- Parámetros de Control
-        self.declare_parameter("control_rate_hz", 50.0)
-        self.declare_parameter("v_nominal", 1.5)
-        self.declare_parameter("max_speed", 2.5)
-        self.declare_parameter("max_omega", 2.0)           # Límite de velocidad angular [rad/s]
+        self.declare_parameter("control_rate_hz", 10.0)
+        self.declare_parameter("v_nominal", 0.15)
+        self.declare_parameter("max_speed", 0.2)
+        self.declare_parameter("max_omega", 1.8)           # Límite de velocidad angular [rad/s]
         self.declare_parameter("goal_tolerance", 0.3)
 
         # ---- Parámetros de Lookahead
