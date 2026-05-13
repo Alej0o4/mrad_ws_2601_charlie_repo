@@ -422,7 +422,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        ara_eps_paths: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -582,7 +582,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -1.8149974346160889
+      Angle: -4.610000133514404
       Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -595,8 +595,8 @@ Visualization Manager:
       Scale: -71.62774658203125
       Target Frame: <Fixed Frame>
       Value: TopDownOrtho (rviz_default_plugins)
-      X: 2.268552303314209
-      Y: 3.1647756099700928
+      X: 3.0755972862243652
+      Y: 0.6372675895690918
     Saved: ~
 Window Geometry:
   Displays:

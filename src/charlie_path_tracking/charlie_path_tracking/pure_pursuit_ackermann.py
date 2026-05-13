@@ -7,12 +7,12 @@ import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
 
-from geometry_msgs.msg import TwistStamped, PoseStamped
+from geometry_msgs.msg import TwistStamped, Point
 from nav_msgs.msg import Path
+from visualization_msgs.msg import Marker, MarkerArray
 
 import tf2_ros
 from tf2_ros import TransformException
-from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy
 
 def clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
@@ -31,20 +31,16 @@ class PurePursuitNode(Node):
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("control_rate_hz", 10.0)
 
-        # ---- Parámetros de Velocidad (Porcentajes / Esfuerzo)
-        self.declare_parameter("v_nominal_pct", 0.15) # Porcentaje de crucero
+        # ---- Parámetros de Velocidad
+        self.declare_parameter("v_nominal_pct", 0.15)
         self.declare_parameter("max_speed_pct", 0.20)
-        self.declare_parameter("min_speed_pct", 0.05) # Velocidad % mínima al frenar
-        
-        # ---- Conversión Cinemática (CRÍTICO)
-        # Relación: (Velocidad real m/s) / (Porcentaje v_cmd) -> ej: 1.35 / 0.15 = 9.0
+        self.declare_parameter("min_speed_pct", 0.05)
         self.declare_parameter("effort_to_ms_ratio", 9.0) 
-
         self.declare_parameter("max_omega", 1.8)
         
-        # ---- Parámetros de Frenado y Tolerancia
+        # ---- Parámetros de Frenado
         self.declare_parameter("goal_tolerance", 0.1)
-        self.declare_parameter("decel_distance", 1.5) # Distancia (m) para empezar a frenar
+        self.declare_parameter("decel_distance", 1.5)
 
         # ---- Parámetros de Lookahead
         self.declare_parameter("lookahead_L0", 0.6)
@@ -69,7 +65,9 @@ class PurePursuitNode(Node):
         self.eps = self.get_parameter("eps").value
         self.tf_timeout = self.get_parameter("tf_timeout_sec").value
 
+        # ---- Publishers y Subscribers
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_topic, 10)
+        self.marker_pub = self.create_publisher(MarkerArray, "/pure_pursuit/debug_markers", 10)
         self.path_sub = self.create_subscription(Path, self.path_topic, self.on_path, 10)
 
         self.tf_buffer = tf2_ros.Buffer(cache_time=Duration(seconds=2.0))
@@ -83,7 +81,7 @@ class PurePursuitNode(Node):
         self.timer = self.create_timer(1.0/self.rate_hz, self.on_timer)
 
     def on_path(self, msg: Path) -> None:
-        self.path_frame = msg.header.frame_id if msg.header.frame_id else None
+        self.path_frame = msg.header.frame_id if msg.header.frame_id else "map"
         if len(msg.poses) > 0 and self.path_frame is not None:
             self.path_array = np.array([[p.pose.position.x, p.pose.position.y] for p in msg.poses])
             self.has_path = True
@@ -108,7 +106,6 @@ class PurePursuitNode(Node):
         ry = tf.transform.translation.y
         ryaw = yaw_from_quaternion(tf.transform.rotation)
 
-        # 1. Zona de Frenado (Deceleration Profile)
         dist_to_goal = np.hypot(self.path_array[-1, 0] - rx, self.path_array[-1, 1] - ry)
 
         if dist_to_goal <= self.goal_tol:
@@ -116,24 +113,22 @@ class PurePursuitNode(Node):
             self.has_path = False
             return
 
+        # Perfil de Velocidad
         v_nom_pct = self.get_parameter("v_nominal_pct").value
         min_pct = self.get_parameter("min_speed_pct").value
         decel_dist = self.get_parameter("decel_distance").value
 
         if dist_to_goal < decel_dist:
-            # Desaceleración lineal según nos acercamos a la meta
             v_cmd = min_pct + (v_nom_pct - min_pct) * (dist_to_goal / decel_dist)
         else:
             v_cmd = v_nom_pct
 
         v_cmd = clamp(v_cmd, min_pct, self.get_parameter("max_speed_pct").value)
-
-        # 2. Lookahead Dinámico
         Ld = clamp(self.L0 + self.kv * v_cmd, self.Lmin, self.Lmax)
 
-        # 3. Ventana de Búsqueda Flexible (Sin límite de 200 puntos)
+        # Búsqueda de Punto
         start = self.last_target_index
-        segment = self.path_array[start:] # Tomamos de la posición actual en adelante
+        segment = self.path_array[start:]
 
         dx = segment[:, 0] - rx
         dy = segment[:, 1] - ry
@@ -156,36 +151,114 @@ class PurePursuitNode(Node):
 
         if len(crossed) > 0:
             target_idx = crossed[0]
-            target_by = v_by[target_idx]
-            self.last_target_index = start + valid_indices[target_idx]
         else:
-            # Si no hay puntos más allá del lookahead, apuntamos al último disponible
-            target_by = v_by[-1]
-            self.last_target_index = start + valid_indices[-1]
+            target_idx = -1
 
-        # 4. Cinemática de Dirección Corregida
-        kappa = (2.0 * target_by) / (Ld * Ld + self.eps)
+        # Extraer coordenadas globales y locales para el control y RViz
+        target_by = v_by[target_idx]
+        target_bx = v_bx[target_idx]
+        global_idx = start + valid_indices[target_idx]
+        target_x_global = self.path_array[global_idx, 0]
+        target_y_global = self.path_array[global_idx, 1]
         
-        # Convertimos el % de comando a la velocidad física real (m/s) para la fórmula
+        self.last_target_index = global_idx
+
+        # Control
+        kappa = (2.0 * target_by) / (Ld * Ld + self.eps)
         ms_ratio = self.get_parameter("effort_to_ms_ratio").value
         v_real_estimada = v_cmd * ms_ratio 
-        
-        # Ahora sí calculamos omega usando la velocidad real (m/s)
         omega = clamp(v_real_estimada * kappa, -self.max_omega, self.max_omega)
 
         self.publish_cmd(v_cmd, omega)
+        
+        # Publicar Debug Markers
+        self.publish_debug_markers(target_x_global, target_y_global, target_bx, target_by, Ld)
+
+    def publish_debug_markers(self, tx_global: float, ty_global: float, tx_local: float, ty_local: float, Ld: float) -> None:
+        """Genera marcadores visuales para RViz."""
+        marker_array = MarkerArray()
+        now = self.get_clock().now().to_msg()
+
+        # 1. Esfera Objetivo (Verde) en el frame global
+        m_target = Marker()
+        m_target.header.frame_id = self.path_frame
+        m_target.header.stamp = now
+        m_target.ns = "lookahead_point"
+        m_target.id = 0
+        m_target.type = Marker.SPHERE
+        m_target.action = Marker.ADD
+        m_target.pose.position.x = float(tx_global)
+        m_target.pose.position.y = float(ty_global)
+        m_target.pose.position.z = 0.0
+        m_target.scale.x = 0.2
+        m_target.scale.y = 0.2
+        m_target.scale.z = 0.2
+        m_target.color.r = 0.0
+        m_target.color.g = 1.0
+        m_target.color.b = 0.0
+        m_target.color.a = 1.0
+
+        # 2. Cilindro de Radio Ld (Azul Translúcido) en el frame del robot
+        m_radius = Marker()
+        m_radius.header.frame_id = self.base_frame
+        m_radius.header.stamp = now
+        m_radius.ns = "lookahead_radius"
+        m_radius.id = 1
+        m_radius.type = Marker.CYLINDER
+        m_radius.action = Marker.ADD
+        m_radius.pose.position.x = 0.0
+        m_radius.pose.position.y = 0.0
+        m_radius.pose.position.z = -0.05 # Ligeramente por debajo para no tapar el robot
+        # El diámetro es 2 * Radio
+        m_radius.scale.x = float(Ld * 2.0)
+        m_radius.scale.y = float(Ld * 2.0)
+        m_radius.scale.z = 0.02 
+        m_radius.color.r = 0.0
+        m_radius.color.g = 0.5
+        m_radius.color.b = 1.0
+        m_radius.color.a = 0.2 # Translúcido
+
+        # 3. Flecha de Dirección (Roja) desde el robot hacia el objetivo local
+        m_arrow = Marker()
+        m_arrow.header.frame_id = self.base_frame
+        m_arrow.header.stamp = now
+        m_arrow.ns = "steering_vector"
+        m_arrow.id = 2
+        m_arrow.type = Marker.ARROW
+        m_arrow.action = Marker.ADD
+        # Start point (robot origin)
+        p_start = Point(x=0.0, y=0.0, z=0.0)
+        # End point (local target)
+        p_end = Point(x=float(tx_local), y=float(ty_local), z=0.0)
+        m_arrow.points = [p_start, p_end]
+        m_arrow.scale.x = 0.05 # Ancho de la línea
+        m_arrow.scale.y = 0.10 # Ancho de la cabeza
+        m_arrow.scale.z = 0.10 # Largo de la cabeza
+        m_arrow.color.r = 1.0
+        m_arrow.color.g = 0.0
+        m_arrow.color.b = 0.0
+        m_arrow.color.a = 0.8
+
+        marker_array.markers = [m_target, m_radius, m_arrow]
+        self.marker_pub.publish(marker_array)
 
     def publish_cmd(self, v: float, w: float) -> None:
         msg = TwistStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = self.base_frame
-        # Se envía 'v' que es un porcentaje, pero 'w' fue calculado usando la física real.
         msg.twist.linear.x = float(v) 
         msg.twist.angular.z = float(w) 
         self.cmd_pub.publish(msg)
 
     def publish_stop(self) -> None:
         self.publish_cmd(0.0, 0.0)
+        
+        # Limpiar marcadores al detenerse
+        marker_array = MarkerArray()
+        m_del = Marker()
+        m_del.action = Marker.DELETEALL
+        marker_array.markers.append(m_del)
+        self.marker_pub.publish(marker_array)
 
 def main():
     rclpy.init()
