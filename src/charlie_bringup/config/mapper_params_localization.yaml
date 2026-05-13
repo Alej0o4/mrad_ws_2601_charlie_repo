@@ -22,7 +22,7 @@ slam_toolbox:
     # will use pose
     # map_file_name: /home/miconra/mrad_ws_2601_charlie_repo/src/charlie_gazebo/real_slam_data/bloque_A_V2_ser.data  ##/home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/slam_data/walls_wolrd2_serialized.data
     # map_file_name: /home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/real_slam_data/bloque_c_ser.data
-    map_file_name: /home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/real_slam_data/salon_12_c_v2_ser.data
+    map_file_name: /home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/real_slam_data/s_16_a_ser.data
     map_start_pose: [0.0, 0.0, 0.0] #x, y, theta in radians
     #map_start_at_dock: true
 

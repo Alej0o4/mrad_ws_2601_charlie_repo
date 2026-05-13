@@ -23,9 +23,18 @@ def generate_launch_description():
 
     declare_map_name_cmd = DeclareLaunchArgument(
         'map_name',
-        default_value='salon_12_c_v2_ser',
+        default_value='s_16_a_ser',
         description='Nombre del mapa serializado a cargar (sin la extension)',
-        choices=['walls_wolrd2_serialized','RaceTrack', 'RaceTrackObs', 'demo_race_track', 'walls_practice','bloque_A_V2_ser','bloque_c_ser','salon_12_c_v2_ser']
+        choices=['walls_wolrd2_serialized',
+                 'RaceTrack', 
+                 'RaceTrackObs', 
+                 'demo_race_track', 
+                 'walls_practice',
+                 'bloque_A_V2_ser',
+                 'bloque_c_ser',
+                 'salon_12_c_v2_ser',
+                 's_16_a_ser'
+                 ]
     )
 
     map_file_path = PathJoinSubstitution([

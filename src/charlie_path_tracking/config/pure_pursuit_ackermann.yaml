@@ -1,6 +1,6 @@
 pure_pursuit_node:
   ros__parameters:
-    path_topic: "/planned_path"
+    path_topic: "/smoothed_path"
     cmd_vel_topic: "/cmd_vel_nav"
     base_frame: "base_link"
     

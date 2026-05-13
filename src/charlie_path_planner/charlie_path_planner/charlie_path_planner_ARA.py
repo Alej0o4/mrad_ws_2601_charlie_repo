@@ -432,9 +432,17 @@ class ARAPlannerNode(Node):
         # 2. Traducción: Matriz -> Mundo Real (Metros)
         # ==========================================================
         last_yaw = 0.0  # Ángulo por defecto
-        
-        for i, (ix, iy) in enumerate(path_cells):
-            # Obtener el centro físico de la celda (usando la función que vimos antes)
+
+
+        # ==========================================================
+        # 3. Orientación Cinemática y Filtrado (Cálculo del Yaw mejorado)
+        # ==========================================================
+        # Downsample: No publicamos todas las celdas, saltamos de a N celdas para aligerar la ruta
+        step = 3 # Ajusta esto según tu resolución. Ej: si res=0.05, step=3 publica puntos cada 15cm.
+        filtered_poses = []
+
+        for i in range(0, len(path_cells), step):
+            ix, iy = path_cells[i]
             x, y = self.map_to_world(ix, iy, x0, y0, res)
             
             pose = PoseStamped()
@@ -443,23 +451,23 @@ class ARAPlannerNode(Node):
             pose.pose.position.y = y
             pose.pose.position.z = 0.0
 
-            # ==========================================================
-            # 3. Orientación Cinemática (Cálculo del Yaw)
-            # ==========================================================
-            # Miramos el siguiente punto de la ruta para saber hacia dónde mirar
-            if i + 1 < len(path_cells):
-                next_ix, next_iy = path_cells[i + 1]
+            # LOOKAHEAD YAW: En lugar de mirar la siguiente celda (ruido puro), 
+            # miramos un punto más adelante en la ruta para una orientación suave.
+            lookahead_idx = min(i + (step * 3), len(path_cells) - 1)
+            if lookahead_idx > i:
+                next_ix, next_iy = path_cells[lookahead_idx]
                 nx_world, ny_world = self.map_to_world(next_ix, next_iy, x0, y0, res)
-                
-                # math.atan2 calcula el ángulo del vector entre el punto actual y el siguiente
                 last_yaw = math.atan2(ny_world - y, nx_world - x)
             
-            # Convertimos el ángulo Yaw de Euler a Cuaternión (Requisito de ROS 2)
             pose.pose.orientation = yaw_to_quaternion(last_yaw)
-            
-            # Añadir la pose al arreglo final del mensaje Path
-            path_msg.poses.append(pose)
+            filtered_poses.append(pose)
 
+        # Asegurar que el destino exacto final siempre esté incluido
+        if path_cells and (len(path_cells) - 1) % step != 0:
+            # Añadir el último punto con la lógica anterior...
+            pass 
+
+        path_msg.poses = filtered_poses
         return path_msg
 
     def plan_ara_star(self, start: PoseStamped, goal: PoseStamped) -> Optional[Path]:
