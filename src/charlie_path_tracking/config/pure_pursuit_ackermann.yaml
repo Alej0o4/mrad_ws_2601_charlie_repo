@@ -14,5 +14,5 @@ pure_pursuit_node:
 
     lookahead_L0: 0.6
     lookahead_kv: 0.15
-    lookahead_min: 0.2
+    lookahead_min: 0.3
     lookahead_max: 0.7
