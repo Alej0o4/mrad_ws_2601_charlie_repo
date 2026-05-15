@@ -106,19 +106,30 @@ class PurePursuitNode(Node):
         ry = tf.transform.translation.y
         ryaw = yaw_from_quaternion(tf.transform.rotation)
 
+        # Distancia física al ÚLTIMO punto de TODA la trayectoria (Final de la vuelta 2)
         dist_to_goal = np.hypot(self.path_array[-1, 0] - rx, self.path_array[-1, 1] - ry)
 
-        if dist_to_goal <= self.goal_tol:
+        # --- VALIDACIÓN DE CIRCUITO PARA MULTIPLES VUELTAS ---
+        # Calculamos cuántos puntos de la ruta original nos faltan por recorrer
+        puntos_restantes = len(self.path_array) - self.last_target_index
+        
+        # Consideramos que estamos en la verdadera recta final si quedan menos de 60 puntos
+        # (Esto equivale a unos 3 metros de distancia si tu spacing es de 0.05m)
+        estamos_en_recta_final = puntos_restantes < 60
+
+        # Solo detenemos el carro si estamos físicamente en la meta Y además es el final de la última vuelta
+        if dist_to_goal <= self.goal_tol and estamos_en_recta_final:
             self.publish_stop()
             self.has_path = False
             return
 
-        # Perfil de Velocidad
+        # --- PERFIL DE VELOCIDAD CORREGIDO ---
         v_nom_pct = self.get_parameter("v_nominal_pct").value
         min_pct = self.get_parameter("min_speed_pct").value
         decel_dist = self.get_parameter("decel_distance").value
 
-        if dist_to_goal < decel_dist:
+        # Solo aplicamos el frenado suave si estamos llegando al final de la última vuelta
+        if estamos_en_recta_final and dist_to_goal < decel_dist:
             v_cmd = min_pct + (v_nom_pct - min_pct) * (dist_to_goal / decel_dist)
         else:
             v_cmd = v_nom_pct
@@ -208,17 +219,16 @@ class PurePursuitNode(Node):
         m_radius.action = Marker.ADD
         m_radius.pose.position.x = 0.0
         m_radius.pose.position.y = 0.0
-        m_radius.pose.position.z = -0.05 # Ligeramente por debajo para no tapar el robot
-        # El diámetro es 2 * Radio
+        m_radius.pose.position.z = -0.05 
         m_radius.scale.x = float(Ld * 2.0)
         m_radius.scale.y = float(Ld * 2.0)
         m_radius.scale.z = 0.02 
         m_radius.color.r = 0.0
         m_radius.color.g = 0.5
         m_radius.color.b = 1.0
-        m_radius.color.a = 0.2 # Translúcido
+        m_radius.color.a = 0.2 
 
-        # 3. Flecha de Dirección (Roja) desde el robot hacia el objetivo local
+        # 3. Flecha de Dirección (Roja)
         m_arrow = Marker()
         m_arrow.header.frame_id = self.base_frame
         m_arrow.header.stamp = now
@@ -226,14 +236,12 @@ class PurePursuitNode(Node):
         m_arrow.id = 2
         m_arrow.type = Marker.ARROW
         m_arrow.action = Marker.ADD
-        # Start point (robot origin)
         p_start = Point(x=0.0, y=0.0, z=0.0)
-        # End point (local target)
         p_end = Point(x=float(tx_local), y=float(ty_local), z=0.0)
         m_arrow.points = [p_start, p_end]
-        m_arrow.scale.x = 0.05 # Ancho de la línea
-        m_arrow.scale.y = 0.10 # Ancho de la cabeza
-        m_arrow.scale.z = 0.10 # Largo de la cabeza
+        m_arrow.scale.x = 0.05 
+        m_arrow.scale.y = 0.10 
+        m_arrow.scale.z = 0.10 
         m_arrow.color.r = 1.0
         m_arrow.color.g = 0.0
         m_arrow.color.b = 0.0
