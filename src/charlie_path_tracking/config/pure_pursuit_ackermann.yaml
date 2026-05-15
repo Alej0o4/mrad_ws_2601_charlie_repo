@@ -4,7 +4,7 @@ pure_pursuit_node:
     cmd_vel_topic: "/cmd_vel_nav"
     base_frame: "base_link"
     
-    control_rate_hz: 10.0
+    control_rate_hz: 20.0
     v_nominal_pct: 0.11
     max_speed_pct: 0.11
     min_speed_pct: 0.05
@@ -12,7 +12,7 @@ pure_pursuit_node:
     goal_tolerance: 0.1
     effort_to_ms_ratio: 9.0
 
-    lookahead_L0: 0.6
+    lookahead_L0: 1.0
     lookahead_kv: 0.15
-    lookahead_min: 0.3
-    lookahead_max: 0.7
+    lookahead_min: 1.0
+    lookahead_max: 1.5

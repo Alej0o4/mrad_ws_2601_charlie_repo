@@ -191,10 +191,10 @@ def generate_launch_description():
 
         # -- Stage 1: base del robot (inmediato) --
         LogInfo(msg="[charlie_full_stack] Iniciando RSP + EKF + sensores..."),
-        ##rsp_ekf_launch,
+        rsp_ekf_launch,
 
         # -- Stage 2: localización (delay 3 s) --
-        ##slam_delayed,
+        slam_delayed,
 
         # -- Stage 3: planificador (delay 6 s) --
         ara_delayed,
