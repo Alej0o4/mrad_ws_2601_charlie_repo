@@ -113,6 +113,6 @@ def generate_launch_description():
             lidar_node,
             bicycle_odom,
             imu_processor_node,
-            start_robot_localization_cmd,
+            # start_robot_localization_cmd, # hay que migrar también bicyle y imu??
         ]
     )
