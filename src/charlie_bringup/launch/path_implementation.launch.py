@@ -121,7 +121,7 @@ def generate_launch_description():
     )
 
     slam_delayed = TimerAction(
-        period=1.0,
+        period=1.5,
         actions=[
             LogInfo(msg="[charlie_full_stack] Iniciando SLAM Toolbox (localización)..."),
             slam_localization_launch,
