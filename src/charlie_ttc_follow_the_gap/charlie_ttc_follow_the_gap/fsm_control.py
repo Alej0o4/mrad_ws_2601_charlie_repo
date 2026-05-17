@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
+from rcl_interfaces.msg import SetParametersResult
 import math
 
 class FsmControl(Node):
@@ -14,10 +15,13 @@ class FsmControl(Node):
         self.declare_parameter('steering_alpha', 0.7)    # Suavizado del servo (0.0 a 1.0)
         
         # --- PARÁMETROS EMPÍRICOS ---
+        self.declare_parameter('cmd_slow', 0.10)
+        self.declare_parameter('cmd_fast', 0.20)
         self.declare_parameter('v_slow_real', 0.412) 
         self.declare_parameter('v_fast_real', 1.255) 
         
         # --- UMBRALES DE TRANSICIÓN ---
+        self.declare_parameter('idle_dist_threshold', 0.20)
         self.declare_parameter('dist_critical', 0.8)   
         self.declare_parameter('angle_critical_deg', 15.0) 
         self.declare_parameter('depth_critical', 2.0)    # NUEVO: Distancia de frenado predictivo
@@ -27,8 +31,11 @@ class FsmControl(Node):
         self.delta_max = math.radians(self.get_parameter('max_steering_deg').value)
         self.kp = self.get_parameter('kp').value
         self.alpha = self.get_parameter('steering_alpha').value
+        self.cmd_slow = self.get_parameter('cmd_slow').value
+        self.cmd_fast = self.get_parameter('cmd_fast').value
         self.v_slow = self.get_parameter('v_slow_real').value
         self.v_fast = self.get_parameter('v_fast_real').value
+        self.idle_dist_threshold = self.get_parameter('idle_dist_threshold').value
         self.d_crit = self.get_parameter('dist_critical').value
         self.a_crit = math.radians(self.get_parameter('angle_critical_deg').value)
         self.depth_crit = self.get_parameter('depth_critical').value
@@ -41,7 +48,16 @@ class FsmControl(Node):
         self.data_sub = self.create_subscription(TwistStamped, '/gap_data', self.control_callback, 10)
         self.vel_pub = self.create_publisher(TwistStamped, '/cmd_vel_ctrl', 10)
 
+        self.add_on_set_parameters_callback(self.parameters_callback)
+
         self.get_logger().info("FSM Control Refactorizado Iniciado.")
+
+    def parameters_callback(self, params):
+        for param in params:
+            self.get_logger().info(f"Parámetro {param.name} actualizado.")
+
+        self._load_params()
+        return SetParametersResult(successful=True)
 
     # ==========================================================
     # ORQUESTADOR PRINCIPAL (Callback)
@@ -70,14 +86,14 @@ class FsmControl(Node):
     # ==========================================================
     def _determine_fsm_state(self, closest_dist, target_angle, target_depth):
         """Evalúa las métricas y retorna: Estado, PWM_lineal, Velocidad_real_esperada."""
-        if closest_dist < 0.2:
+        if closest_dist < self.idle_dist_threshold:
             return "IDLE", 0.0, 0.0
             
         # Condición para SLOW: Peligro inminente OR Curva cerrada OR Final del pasillo cerca
         if closest_dist < self.d_crit or abs(target_angle) > self.a_crit or target_depth < self.depth_crit:
-            return "SLOW", 0.04, self.v_slow
+            return "SLOW", self.cmd_slow, self.v_slow
             
-        return "FAST", 0.051, self.v_fast
+        return "FAST", self.cmd_fast, self.v_fast
 
     def _calculate_dynamic_w_max(self, v_real):
         """Calcula el límite angular seguro basado en la cinemática de Ackermann."""

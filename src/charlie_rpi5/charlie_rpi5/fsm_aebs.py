@@ -20,12 +20,18 @@ class FsmAebs(Node):
         self.declare_parameter('ttc_threshold_fast', 1.1) # TTC para velocidad alta (más tiempo para resbalar)
         self.declare_parameter('min_safe_distance', 0.20) # Burbuja estática
         self.declare_parameter('scan_timeout_sec', 0.5)
+        self.declare_parameter('min_motion_velocity', 0.05)
+        self.declare_parameter('straight_turn_w_threshold', 0.05)
+        self.declare_parameter('lane_margin', 0.10)
+        self.declare_parameter('range_min_valid', 0.10)
+        self.declare_parameter('min_danger_points', 3)
 
         # --- PARÁMETROS EMPÍRICOS (Mapping PWM -> Real Speed) ---
-        self.declare_parameter('v_slow_real', 0.412) 
-        self.declare_parameter('v_fast_real', 1.255) 
-        self.declare_parameter('pwm_fast_threshold', 0.045)
-        self.declare_parameter('pwm_deadzone', 0.01)
+        self.declare_parameter('v_slow_real', 1.30) 
+        self.declare_parameter('v_fast_real', 1.40) 
+        self.declare_parameter('pwm_fast_threshold', 0.15)
+        self.declare_parameter('pwm_deadzone', 0.08)
+        self.declare_parameter('stop_pwm', 0.0)
 
         # Cargar valores iniciales
         self._load_params()
@@ -55,12 +61,20 @@ class FsmAebs(Node):
         self.ttc_fast = self.get_parameter('ttc_threshold_fast').value
         self.min_dist = self.get_parameter('min_safe_distance').value
         self.timeout = self.get_parameter('scan_timeout_sec').value
+        self.min_motion_velocity = self.get_parameter('min_motion_velocity').value
+        self.turn_threshold = self.get_parameter('straight_turn_w_threshold').value
+        self.lane_margin = self.get_parameter('lane_margin').value
+        self.range_min_valid = self.get_parameter('range_min_valid').value
+        self.min_danger_points = int(self.get_parameter('min_danger_points').value)
         self.yaw_offset = self.get_parameter('lidar_yaw_offset').value
         
         self.v_slow = self.get_parameter('v_slow_real').value
         self.v_fast = self.get_parameter('v_fast_real').value
         self.p_fast_th = self.get_parameter('pwm_fast_threshold').value
         self.p_dead = self.get_parameter('pwm_deadzone').value
+        self.stop_pwm = self.get_parameter('stop_pwm').value
+
+        self.half_width = (self.width / 2.0) + self.lane_margin
 
     def parameters_callback(self, params):
         for param in params:
@@ -80,7 +94,7 @@ class FsmAebs(Node):
             self.base_angles = np.arctan2(np.sin(angles), np.cos(angles))
             
         # Filtro de puntos válidos
-        valid = np.isfinite(raw_ranges) & (raw_ranges > 0.1)
+            valid = np.isfinite(raw_ranges) & (raw_ranges > self.range_min_valid)
         self.ranges = raw_ranges[valid]
         self.angles = self.base_angles[valid]
 
@@ -101,7 +115,7 @@ class FsmAebs(Node):
         w_cmd = msg.twist.angular.z  # <--- Extraemos la intención de giro
         v_real = self._get_real_velocity(pwm_in)
 
-        if abs(v_real) < 0.05: # Robot casi quieto
+        if abs(v_real) < self.min_motion_velocity: # Robot casi quieto
             self.cmd_pub.publish(msg)
             return
 
@@ -152,7 +166,7 @@ class FsmAebs(Node):
         current_ttc_limit = self.ttc_fast if abs(v_real) > v_midpoint else self.ttc_slow
 
         # 3. EVALUACIÓN GEOMÉTRICA (Túnel Recto vs Curvo)
-        if abs(w_cmd) < 0.05:
+        if abs(w_cmd) < self.turn_threshold:
             in_lane_mask = np.abs(y_rel) < self.half_width
         else:
             R = v_real / w_cmd
@@ -173,7 +187,7 @@ class FsmAebs(Node):
         ttc_values = distances_in_path / abs(v_real)
         danger_ttc = ttc_values[ttc_values < current_ttc_limit]
         
-        if len(danger_ttc) >= 3:
+        if len(danger_ttc) >= self.min_danger_points:
             return False, np.min(danger_ttc), "TTC"
 
         return True, 0.0, "NONE"
@@ -184,7 +198,7 @@ class FsmAebs(Node):
         
         stop_msg = TwistStamped()
         stop_msg.header = original_msg.header
-        stop_msg.twist.linear.x = 0.0  # PWM 0: Stop total
+        stop_msg.twist.linear.x = self.stop_pwm  # PWM parametrizado: Stop total
         stop_msg.twist.angular.z = original_msg.twist.angular.z # Mantiene ángulo (opcional)
         self.cmd_pub.publish(stop_msg)
 
