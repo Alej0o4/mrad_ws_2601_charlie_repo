@@ -80,11 +80,30 @@ def generate_launch_description():
         parameters=[fsm_aebs_params_file] 
     )
 
+    # D. ESC Custom FOC (Agregado desde comando de consola)
+    esc_custom_foc_node = Node(
+        package='yb_eb_pkg',
+        executable='esc_node_custom_foc',
+        name='esc_node_custom_foc',
+        output='screen',
+        parameters=[{
+            'vehicle': 'hosim',
+            'max_speed_rpm': 7000,
+            'iq_limit_a': 20.0,
+            'ol_target_rpm': 1600,
+            'cl_mode': 'full',
+            'observer_mode': 0,
+            'max_linear_mps': 2.0,
+            'cmd_hz': 20
+        }]
+    )
+
     # --- 5. RETORNO DEL LAUNCH ---
     return LaunchDescription([
         enable_lidar_arg,
         enable_aebs_arg,
         external_esc_node,
         lidar_include,
-        fsm_aebs_node
+        fsm_aebs_node,
+        esc_custom_foc_node
     ])
