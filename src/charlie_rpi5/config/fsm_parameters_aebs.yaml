@@ -1,0 +1,18 @@
+fsm_aebs_node:
+  ros__parameters:
+    # Geometría
+    robot_width: 0.15
+    chassis_length: 0.37
+    lidar_yaw_offset: 0.0
+    
+    # Seguridad
+    ttc_threshold_slow: 1.0    # A 0.4 m/s frena a ~28cm + inercia
+    ttc_threshold_fast: 1.5    # A 1.25 m/s frena a ~1.5m + inercia (compensando resbalamiento)
+    min_safe_distance: 0.15   # Burbuja: Frenar si algo toca 22cm del parachoques
+    scan_timeout_sec: 0.5     # Frenar si el Lidar se congela 500ms
+    
+    # Mapeo Empírico (Debe coincidir con fsm_control)
+    v_slow_real: 0.412        # Velocidad real @ PWM 0.04
+    v_fast_real: 1.255 ##1.255        # Velocidad real @ PWM 0.05
+    pwm_fast_threshold: 0.045 # Umbral para identificar el comando del 5%
+    pwm_deadzone: 0.01         # Umbral para identificar parado
