@@ -5,6 +5,7 @@ from nav_msgs.srv import GetPlan
 from nav_msgs.msg import Path
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 from visualization_msgs.msg import Marker, MarkerArray
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy, ReliabilityPolicy
 
 class WaypointManager(Node):
     def __init__(self):
@@ -22,7 +23,14 @@ class WaypointManager(Node):
         self.current_req_index = 0
         self.declare_parameter('num_laps', 1)
 
-        self.path_pub = self.create_publisher(Path, '/current_active_path', 10)
+        latched_qos = QoSProfile(
+            depth=1,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+
+        self.path_pub = self.create_publisher(Path, '/current_active_path', latched_qos)
         self.marker_pub = self.create_publisher(MarkerArray, '/waypoint_markers', 10)
 
         self.declare_parameter('use_rviz_clicks', True)
