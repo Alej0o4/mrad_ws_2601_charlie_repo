@@ -152,7 +152,7 @@ class ARAPlannerNode(Node):
             obstacles = np.logical_or(obstacles, dist_cells <= inflation_cells)
 
         self._obstacles = obstacles
-        self.get_logger().info(f'Map received: {W}x{H}, res={res:.3f} m/px')
+        # self.get_logger().info(f'Map received: {W}x{H}, res={res:.3f} m/px')
 
     def compute_distance_to_obstacles(self, obstacles: np.ndarray) -> np.ndarray:
         """Brushfire / multi-source BFS distance transform (4-connected).

@@ -5,7 +5,7 @@ from geometry_msgs.msg import PoseStamped, Quaternion
 import numpy as np
 from scipy.interpolate import splprep, splev
 import math
-from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy, ReliabilityPolicy
 
 class PathSmoother(Node):
     def __init__(self):
@@ -24,14 +24,15 @@ class PathSmoother(Node):
         wheelbase = self.get_parameter('wheelbase').get_parameter_value().double_value
         max_steering_rad = math.radians(self.get_parameter('max_steering_angle_deg').get_parameter_value().double_value)
         self.min_turning_radius = wheelbase / math.tan(max_steering_rad)
-        
-        self.sub = self.create_subscription(Path, '/current_active_path', self.path_callback, 10)
 
         latched_qos = QoSProfile(
             depth=1,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
-            history=QoSHistoryPolicy.KEEP_LAST
+            history=QoSHistoryPolicy.KEEP_LAST,
+            reliability=ReliabilityPolicy.RELIABLE,
         )
+        
+        self.sub = self.create_subscription(Path, '/current_active_path', self.path_callback, latched_qos)
         
         # Aplicarlo al publicador de la ruta suavizada
         self.pub = self.create_publisher(Path, '/smoothed_path', latched_qos)

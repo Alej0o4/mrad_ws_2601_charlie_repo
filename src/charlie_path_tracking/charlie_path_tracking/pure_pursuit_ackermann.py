@@ -13,6 +13,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 import tf2_ros
 from tf2_ros import TransformException
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy, ReliabilityPolicy
 
 def clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
@@ -26,7 +27,7 @@ class PurePursuitNode(Node):
     def __init__(self):
         super().__init__("pure_pursuit_node")
 
-        self.declare_parameter("path_topic", "/planned_path")
+        self.declare_parameter("path_topic", "/smoothed_path")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_nav")
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("control_rate_hz", 10.0)
@@ -65,10 +66,17 @@ class PurePursuitNode(Node):
         self.eps = self.get_parameter("eps").value
         self.tf_timeout = self.get_parameter("tf_timeout_sec").value
 
+        path_qos = QoSProfile(
+            depth=1,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+
         # ---- Publishers y Subscribers
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_topic, 10)
         self.marker_pub = self.create_publisher(MarkerArray, "/pure_pursuit/debug_markers", 10)
-        self.path_sub = self.create_subscription(Path, self.path_topic, self.on_path, 10)
+        self.path_sub = self.create_subscription(Path, self.path_topic, self.on_path, path_qos)
 
         self.tf_buffer = tf2_ros.Buffer(cache_time=Duration(seconds=2.0))
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
