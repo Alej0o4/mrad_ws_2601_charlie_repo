@@ -94,7 +94,7 @@ class FsmAebs(Node):
             self.base_angles = np.arctan2(np.sin(angles), np.cos(angles))
             
         # Filtro de puntos válidos
-            valid = np.isfinite(raw_ranges) & (raw_ranges > self.range_min_valid)
+        valid = np.isfinite(raw_ranges) & (raw_ranges > self.range_min_valid)
         self.ranges = raw_ranges[valid]
         self.angles = self.base_angles[valid]
 
