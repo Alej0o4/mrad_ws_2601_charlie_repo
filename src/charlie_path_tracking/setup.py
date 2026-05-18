@@ -32,6 +32,7 @@ setup(
             'mpc_controller_node = charlie_path_tracking.mpc_controller_node:main',
             'stanley_node = charlie_path_tracking.stanley_node:main',
             'pure_pursuit_ackermann = charlie_path_tracking.pure_pursuit_ackermann:main',
+            'bt_orchestrator = charlie_path_tracking.bt_orchestrator:main',
         ],
     },
 )

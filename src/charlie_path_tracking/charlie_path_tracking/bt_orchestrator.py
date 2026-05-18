@@ -6,10 +6,12 @@ from nav_msgs.msg import Path  # IMPORTANTE: Añadir el mensaje de la ruta
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, QoSDurabilityPolicy
 from geometry_msgs.msg import PoseStamped
 import py_trees
+import py_trees_ros.actions
 import py_trees_ros.trees
 import math
 import tf2_ros
 from tf2_geometry_msgs import do_transform_pose
+from charlie_interfaces.action import PurePursuit
 
 # ==========================================
 # 1. COMPORTAMIENTO (Lógica Pura con Proyección)
@@ -162,6 +164,24 @@ class IsPathClear(py_trees.behaviour.Behaviour):
 class AccionFalsa(py_trees.behaviour.Behaviour):
     def update(self): return py_trees.common.Status.RUNNING
 
+class PurePursuitClient(py_trees_ros.actions.ActionClient):
+    def __init__(self, name="PurePursuit"):
+        super().__init__(
+            name=name,
+            action_type=PurePursuit,
+            action_name="pure_pursuit_action",
+            generate_goal_fn=self.generate_goal # <--- La magia se conecta aquí
+        )
+        self.blackboard.register_key(key="latest_path", access=py_trees.common.Access.READ)
+
+    def generate_goal(self):
+        if self.blackboard.latest_path is None:
+            return None # Si no hay ruta, no enviamos nada
+        
+        goal = PurePursuit.Goal()
+        goal.path = self.blackboard.latest_path
+        return goal
+
 # ==========================================
 # 2. NODO ROS 2 ESTÁNDAR (Comunicaciones)
 # ==========================================
@@ -234,7 +254,7 @@ class OrchestratorNode(Node):
             robot_width=self.robot_width
         )
         
-        rama_principal.add_children([nodo_condicion, AccionFalsa(name="PurePursuit")])
+        rama_principal.add_children([nodo_condicion, PurePursuitClient(name="PurePursuit")])
         root.add_children([rama_principal, AccionFalsa(name="FollowTheGap")])
         return root
     

@@ -6,13 +6,17 @@ from typing import Optional
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 from geometry_msgs.msg import TwistStamped, Point
-from nav_msgs.msg import Path
+# nav_msgs.Path is available inside the action goal; no Path subscription needed here
 from visualization_msgs.msg import Marker, MarkerArray
 
 import tf2_ros
 from tf2_ros import TransformException
+from charlie_interfaces.action import PurePursuit
+import time
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSHistoryPolicy, ReliabilityPolicy
 
 def clamp(x: float, lo: float, hi: float) -> float:
@@ -27,7 +31,7 @@ class PurePursuitNode(Node):
     def __init__(self):
         super().__init__("pure_pursuit_node")
 
-        self.declare_parameter("path_topic", "/smoothed_path")
+        # path is provided via Action goal now; remove topic param
         self.declare_parameter("cmd_vel_topic", "/cmd_vel_nav")
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("control_rate_hz", 10.0)
@@ -52,7 +56,7 @@ class PurePursuitNode(Node):
         self.declare_parameter("eps", 1e-6)
         self.declare_parameter("tf_timeout_sec", 0.1)
 
-        self.path_topic = self.get_parameter("path_topic").value
+        # path_topic removed (action provides path)
         self.cmd_topic = self.get_parameter("cmd_vel_topic").value
         self.base_frame = self.get_parameter("base_frame").value
         self.rate_hz = self.get_parameter("control_rate_hz").value
@@ -66,17 +70,9 @@ class PurePursuitNode(Node):
         self.eps = self.get_parameter("eps").value
         self.tf_timeout = self.get_parameter("tf_timeout_sec").value
 
-        path_qos = QoSProfile(
-            depth=1,
-            history=QoSHistoryPolicy.KEEP_LAST,
-            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
-            reliability=ReliabilityPolicy.RELIABLE,
-        )
-
-        # ---- Publishers y Subscribers
+        # ---- Publishers
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_topic, 10)
         self.marker_pub = self.create_publisher(MarkerArray, "/pure_pursuit/debug_markers", 10)
-        self.path_sub = self.create_subscription(Path, self.path_topic, self.on_path, path_qos)
 
         self.tf_buffer = tf2_ros.Buffer(cache_time=Duration(seconds=2.0))
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -86,112 +82,149 @@ class PurePursuitNode(Node):
         self.has_path = False
         self.last_target_index = 0
 
-        self.timer = self.create_timer(1.0/self.rate_hz, self.on_timer)
+        # Action server and callback group so TF listening isn't blocked
+        self._action_cb_group = ReentrantCallbackGroup()
+        self._action_server = ActionServer(
+            self,
+            PurePursuit,
+            'pure_pursuit_action',
+            execute_callback=self.execute_callback,
+            goal_callback=self.goal_callback,
+            cancel_callback=self.cancel_callback,
+            callback_group=self._action_cb_group,
+        )
 
-    def on_path(self, msg: Path) -> None:
-        self.path_frame = msg.header.frame_id if msg.header.frame_id else "map"
-        if len(msg.poses) > 0 and self.path_frame is not None:
-            self.path_array = np.array([[p.pose.position.x, p.pose.position.y] for p in msg.poses])
+    # path subscription removed: path is received in the Action goal
+
+    def goal_callback(self, goal_request):
+        return GoalResponse.ACCEPT
+
+    def cancel_callback(self, goal_handle):
+        return CancelResponse.ACCEPT
+
+    def execute_callback(self, goal_handle):
+        # Extract path from goal and initialize
+        path_msg = goal_handle.request.path
+        self.path_frame = path_msg.header.frame_id if path_msg.header.frame_id else "map"
+        if len(path_msg.poses) > 0 and self.path_frame is not None:
+            self.path_array = np.array([[p.pose.position.x, p.pose.position.y] for p in path_msg.poses])
             self.has_path = True
             self.last_target_index = 0
         else:
             self.has_path = False
 
-    def on_timer(self) -> None:
-        if not self.has_path or self.path_array is None:
-            self.publish_stop()
-            return
+        feedback_msg = PurePursuit.Feedback()
+        result = PurePursuit.Result()
 
-        try:
-            tf = self.tf_buffer.lookup_transform(
-                self.path_frame, self.base_frame, rclpy.time.Time(),
-                timeout=Duration(seconds=self.tf_timeout)
-            )
-        except TransformException:
-            return
+        start_time = time.time()
+        rate = rclpy.rate.Rate(self.rate_hz, self.get_clock())
 
-        rx = tf.transform.translation.x
-        ry = tf.transform.translation.y
-        ryaw = yaw_from_quaternion(tf.transform.rotation)
+        while rclpy.ok():
+            # Handle cancellation
+            if goal_handle.is_cancel_requested:
+                self.publish_stop()
+                goal_handle.canceled()
+                result.success = False
+                result.total_time = float(time.time() - start_time)
+                return result
 
-        # Distancia física al ÚLTIMO punto de TODA la trayectoria (Final de la vuelta 2)
-        dist_to_goal = np.hypot(self.path_array[-1, 0] - rx, self.path_array[-1, 1] - ry)
+            if not self.has_path or self.path_array is None:
+                self.publish_stop()
+                rate.sleep()
+                continue
 
-        # --- VALIDACIÓN DE CIRCUITO PARA MULTIPLES VUELTAS ---
-        # Calculamos cuántos puntos de la ruta original nos faltan por recorrer
-        puntos_restantes = len(self.path_array) - self.last_target_index
+            try:
+                tf = self.tf_buffer.lookup_transform(
+                    self.path_frame, self.base_frame, rclpy.time.Time(),
+                    timeout=Duration(seconds=self.tf_timeout)
+                )
+            except TransformException:
+                rate.sleep()
+                continue
+
+            rx = tf.transform.translation.x
+            ry = tf.transform.translation.y
+            ryaw = yaw_from_quaternion(tf.transform.rotation)
+
+            dist_to_goal = np.hypot(self.path_array[-1, 0] - rx, self.path_array[-1, 1] - ry)
+            puntos_restantes = len(self.path_array) - self.last_target_index
+            estamos_en_recta_final = puntos_restantes < 60
+
+            if dist_to_goal <= self.goal_tol and estamos_en_recta_final:
+                self.publish_stop()
+                goal_handle.succeed()
+                result.success = True
+                result.total_time = float(time.time() - start_time)
+                return result
+
+            v_nom_pct = self.get_parameter("v_nominal_pct").value
+            min_pct = self.get_parameter("min_speed_pct").value
+            decel_dist = self.get_parameter("decel_distance").value
+
+            if estamos_en_recta_final and dist_to_goal < decel_dist:
+                v_cmd = min_pct + (v_nom_pct - min_pct) * (dist_to_goal / decel_dist)
+            else:
+                v_cmd = v_nom_pct
+
+            v_cmd = clamp(v_cmd, min_pct, self.get_parameter("max_speed_pct").value)
+            Ld = clamp(self.L0 + self.kv * v_cmd, self.Lmin, self.Lmax)
+
+            start = self.last_target_index
+            segment = self.path_array[start:]
+
+            dx = segment[:, 0] - rx
+            dy = segment[:, 1] - ry
+            
+            cos_y, sin_y = math.cos(ryaw), math.sin(ryaw)
+            bx = dx * cos_y + dy * sin_y
+            by = -dx * sin_y + dy * cos_y
+
+            front_mask = bx > 0.0
+            valid_indices = np.where(front_mask)[0]
+            
+            if len(valid_indices) == 0:
+                self.publish_stop()
+                rate.sleep()
+                continue
+
+            v_bx = bx[valid_indices]
+            v_by = by[valid_indices]
+            dist = np.hypot(v_bx, v_by)
+            crossed = np.where(dist >= Ld)[0]
+
+            if len(crossed) > 0:
+                target_idx = crossed[0]
+            else:
+                target_idx = -1
+
+            target_by = v_by[target_idx]
+            target_bx = v_bx[target_idx]
+            global_idx = start + valid_indices[target_idx]
+            target_x_global = self.path_array[global_idx, 0]
+            target_y_global = self.path_array[global_idx, 1]
+            
+            self.last_target_index = global_idx
+
+            kappa = (2.0 * target_by) / (Ld * Ld + self.eps)
+            ms_ratio = self.get_parameter("effort_to_ms_ratio").value
+            v_real_estimada = v_cmd * ms_ratio 
+            omega = clamp(v_real_estimada * kappa, -self.max_omega, self.max_omega)
+
+            self.publish_cmd(v_cmd, omega)
+            self.publish_debug_markers(target_x_global, target_y_global, target_bx, target_by, Ld)
+
+            if goal_handle.is_active:
+                feedback_msg.distance_remaining = float(dist_to_goal)
+                feedback_msg.current_speed = float(v_cmd)
+                goal_handle.publish_feedback(feedback_msg)
+
+            rate.sleep()
         
-        # Consideramos que estamos en la verdadera recta final si quedan menos de 60 puntos
-        # (Esto equivale a unos 3 metros de distancia si tu spacing es de 0.05m)
-        estamos_en_recta_final = puntos_restantes < 60
+        result.success = False
+        result.total_time = float(time.time() - start_time)
+        return result
 
-        # Solo detenemos el carro si estamos físicamente en la meta Y además es el final de la última vuelta
-        if dist_to_goal <= self.goal_tol and estamos_en_recta_final:
-            self.publish_stop()
-            self.has_path = False
-            return
-
-        # --- PERFIL DE VELOCIDAD CORREGIDO ---
-        v_nom_pct = self.get_parameter("v_nominal_pct").value
-        min_pct = self.get_parameter("min_speed_pct").value
-        decel_dist = self.get_parameter("decel_distance").value
-
-        # Solo aplicamos el frenado suave si estamos llegando al final de la última vuelta
-        if estamos_en_recta_final and dist_to_goal < decel_dist:
-            v_cmd = min_pct + (v_nom_pct - min_pct) * (dist_to_goal / decel_dist)
-        else:
-            v_cmd = v_nom_pct
-
-        v_cmd = clamp(v_cmd, min_pct, self.get_parameter("max_speed_pct").value)
-        Ld = clamp(self.L0 + self.kv * v_cmd, self.Lmin, self.Lmax)
-
-        # Búsqueda de Punto
-        start = self.last_target_index
-        segment = self.path_array[start:]
-
-        dx = segment[:, 0] - rx
-        dy = segment[:, 1] - ry
-        
-        cos_y, sin_y = math.cos(ryaw), math.sin(ryaw)
-        bx = dx * cos_y + dy * sin_y
-        by = -dx * sin_y + dy * cos_y
-
-        front_mask = bx > 0.0
-        valid_indices = np.where(front_mask)[0]
-        
-        if len(valid_indices) == 0:
-            self.publish_stop()
-            return
-
-        v_bx = bx[valid_indices]
-        v_by = by[valid_indices]
-        dist = np.hypot(v_bx, v_by)
-        crossed = np.where(dist >= Ld)[0]
-
-        if len(crossed) > 0:
-            target_idx = crossed[0]
-        else:
-            target_idx = -1
-
-        # Extraer coordenadas globales y locales para el control y RViz
-        target_by = v_by[target_idx]
-        target_bx = v_bx[target_idx]
-        global_idx = start + valid_indices[target_idx]
-        target_x_global = self.path_array[global_idx, 0]
-        target_y_global = self.path_array[global_idx, 1]
-        
-        self.last_target_index = global_idx
-
-        # Control
-        kappa = (2.0 * target_by) / (Ld * Ld + self.eps)
-        ms_ratio = self.get_parameter("effort_to_ms_ratio").value
-        v_real_estimada = v_cmd * ms_ratio 
-        omega = clamp(v_real_estimada * kappa, -self.max_omega, self.max_omega)
-
-        self.publish_cmd(v_cmd, omega)
-        
-        # Publicar Debug Markers
-        self.publish_debug_markers(target_x_global, target_y_global, target_bx, target_by, Ld)
+    # on_timer removed; control loop now runs inside the ActionServer execute_callback
 
     def publish_debug_markers(self, tx_global: float, ty_global: float, tx_local: float, ty_local: float, Ld: float) -> None:
         """Genera marcadores visuales para RViz."""
@@ -279,12 +312,18 @@ class PurePursuitNode(Node):
 def main():
     rclpy.init()
     node = PurePursuitNode()
+    executor = rclpy.executors.MultiThreadedExecutor()
     try:
-        rclpy.spin(node)
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
         node.publish_stop()
+        try:
+            node._action_server.destroy()
+        except Exception:
+            pass
         node.destroy_node()
         rclpy.shutdown()
 
