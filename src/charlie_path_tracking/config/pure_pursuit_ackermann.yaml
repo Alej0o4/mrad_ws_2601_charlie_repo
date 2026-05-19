@@ -5,8 +5,8 @@ pure_pursuit_node:
     base_frame: "base_link"
     
     control_rate_hz: 30.0
-    v_nominal_pct: 0.30
-    max_speed_pct: 0.30
+    v_nominal_pct: 0.15
+    max_speed_pct: 0.15
     min_speed_pct: 0.05
     max_omega: 1.8       # Ajusta según la capacidad de giro de tu carro
     goal_tolerance: 0.1

@@ -36,7 +36,7 @@ def generate_launch_description():
 
     declare_map_name = DeclareLaunchArgument(
         "map_name",
-        default_value="b_a_2_ser",
+        default_value="b_a_carrera_ser",
         description="Nombre del mapa serializado a cargar (sin extensión)",
         choices=[
             "walls_wolrd2_serialized",
@@ -50,6 +50,8 @@ def generate_launch_description():
             "s_16_a_ser",
             "b_a_ser",
             "b_a_2_ser",
+            "b_a_19_ser",
+            "b_a_carrera_ser"
         ],
     )
 
