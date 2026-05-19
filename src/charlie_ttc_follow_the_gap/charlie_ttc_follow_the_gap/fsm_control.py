@@ -51,6 +51,7 @@ class FsmControl(Node):
         self.add_on_set_parameters_callback(self.parameters_callback)
 
         self.get_logger().info("FSM Control Refactorizado Iniciado.")
+        self.get_logger().info(f"Parámetros cargados: V_slow={self.v_slow:.2f} m/s, V_fast={self.v_fast:.2f} m/s")
 
     def parameters_callback(self, params):
         for param in params:

@@ -2,7 +2,7 @@ fsm_control:
   ros__parameters:
     wheelbase: 0.257
     max_steering_deg: 20.0
-    kp: 0.4
+    kp: 5.0
     steering_alpha: 0.7     # 1.0 = respuesta instantánea, 0.1 = muy suave
     cmd_slow: 0.10
     cmd_fast: 0.20
@@ -11,15 +11,15 @@ fsm_control:
     idle_dist_threshold: 0.20
     dist_critical: 0.5      # Frenar si algo se acerca por los lados a 90cm
     angle_critical_deg: 12.0 
-    depth_critical: 3.0    # Frenar si la pared frontal está a menos de 2.5m
+    depth_critical: 4.0    # Frenar si la pared frontal está a menos de 2.5m
 
 fsm_gap_finder:
   ros__parameters:
     robot_width: 0.27
     fov_angle: 0.9     # 60 grados en radianes
-    safety_margin: 0.2
-    horizon_dist: 3.5
+    safety_margin: 0.1
+    horizon_dist: 5.0
     debug_mode: true        # NUEVO: true para ver markers en RViz, false para competencia
     # --- NUEVOS PARÁMETROS AVANZADOS ---
     center_bias: 0.4          # 0.0 = Apuenta solo a la profundidad, 1.0 = Apunta exacto al centro del hueco
-    hysteresis_penalty: 4.0   # Factor de penalización. Si oscila mucho, sube este valor a 4.0 o 5.0
+    hysteresis_penalty: 2.0   # Factor de penalización. Si oscila mucho, sube este valor a 4.0 o 5.0
