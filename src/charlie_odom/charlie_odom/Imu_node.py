@@ -108,7 +108,7 @@ class ImuProcessorNode(Node):
         raw_gyro = np.array([
             msg.angular_velocity.x,
             msg.angular_velocity.y,
-            msg.angular_velocity.z
+            -msg.angular_velocity.z
         ])
         raw_accel = np.array([
             msg.linear_acceleration.x,
@@ -120,10 +120,10 @@ class ImuProcessorNode(Node):
         R = self._get_imu_rotation()
         if R is not None:
             # Si el IMU está rotado respecto base_link, rotar giroscopio
-            gyro_corrected = raw_gyro
+            gyro_corrected = R @raw_gyro
         else:
             # Si no hay transformación, asumir que IMU está bien alineada
-            gyro_corrected = R @raw_gyro
+            gyro_corrected = raw_gyro
         
         # Acelerómetro sin rotar (como en Yahboom)
         accel_for_filter = raw_accel
