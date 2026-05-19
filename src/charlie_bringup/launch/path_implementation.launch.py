@@ -9,7 +9,8 @@ from launch.actions import (
     GroupAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, NotSubstitution
+from launch.conditions import IfCondition
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -57,7 +58,7 @@ def generate_launch_description():
         default_value=os.path.join(
             get_package_share_directory(bringup_pkg),
             "config",
-            "mapper_params_localization.yaml",
+            "mapper_params_localization_v2.yaml",
         ),
         description="Ruta al archivo de parámetros del slam_toolbox",
     )
@@ -74,6 +75,12 @@ def generate_launch_description():
         description="Usar lifecycle manager externo para slam_toolbox",
     )
 
+    declare_mapping = DeclareLaunchArgument(
+        "mapping",
+        default_value="false",
+        description="Habilitar modo mappeo en lugar de localizacion",
+    )
+
     # ===========================================================
     # REFERENCIAS A LOS ARGUMENTOS
     # ===========================================================
@@ -82,6 +89,7 @@ def generate_launch_description():
     slam_params_file     = LaunchConfiguration("slam_params_file")
     autostart            = LaunchConfiguration("autostart")
     use_lifecycle_manager = LaunchConfiguration("use_lifecycle_manager")
+    mapping              = LaunchConfiguration("mapping")
 
     # ===========================================================
     # STAGE 1 — RSP + EKF + Joystick + LiDAR + Odometría
@@ -99,8 +107,8 @@ def generate_launch_description():
     )
 
     # ===========================================================
-    # STAGE 2 — SLAM Toolbox (Localización)
-    # Se retrasa 3 s para que rsp/EKF ya estén publicando TF
+    # STAGE 2A — SLAM Toolbox (Localización) - default
+    # Se retrasa 1 s para que rsp/EKF ya estén publicando TF
     # antes de que slam_toolbox intente suscribirse al árbol.
     # ===========================================================
     slam_localization_launch = IncludeLaunchDescription(
@@ -111,6 +119,7 @@ def generate_launch_description():
                 "slam_localization.launch.py",
             ])
         ]),
+        condition=IfCondition(NotSubstitution(mapping)),
         launch_arguments={
             "use_sim_time":          use_sim_time,
             "map_name":              map_name,
@@ -120,18 +129,50 @@ def generate_launch_description():
         }.items(),
     )
 
-    slam_delayed = TimerAction(
-        period=1.5,
+    slam_localization_delayed = TimerAction(
+        period=1.0,
         actions=[
             LogInfo(msg="[charlie_full_stack] Iniciando SLAM Toolbox (localización)..."),
             slam_localization_launch,
         ],
+        condition=IfCondition(NotSubstitution(mapping)),
+    )
+
+    # ===========================================================
+    # STAGE 2B — SLAM Toolbox (Mappeo) - si mapping:=True
+    # Se retrasa 1 s para que rsp/EKF ya estén publicando TF
+    # antes de que slam_toolbox intente suscribirse al árbol.
+    # ===========================================================
+    slam_mapping_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare(bringup_pkg),
+                "launch",
+                "slam_mapping.launch.py",
+            ])
+        ]),
+        condition=IfCondition(mapping),
+        launch_arguments={
+            "use_sim_time":          use_sim_time,
+            "autostart":             autostart,
+            "use_lifecycle_manager": use_lifecycle_manager,
+        }.items(),
+    )
+
+    slam_mapping_delayed = TimerAction(
+        period=1.0,
+        actions=[
+            LogInfo(msg="[charlie_full_stack] Iniciando SLAM Toolbox (mappeo)..."),
+            slam_mapping_launch,
+        ],
+        condition=IfCondition(mapping),
     )
 
     # ===========================================================
     # STAGE 3 — Planificador ARA*
-    # Se retrasa 6 s para que el mapa ya esté disponible vía SLAM
+    # Se retrasa 2 s para que el mapa ya esté disponible vía SLAM
     # antes de que ara_star_node empiece a pedir rutas.
+    # Solo se lanza en modo localización (no en mappeo).
     # ===========================================================
     ara_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -141,6 +182,7 @@ def generate_launch_description():
                 "ara.launch.py",
             ])
         ]),
+        condition=IfCondition(NotSubstitution(mapping)),
     )
 
     ara_delayed = TimerAction(
@@ -149,18 +191,21 @@ def generate_launch_description():
             LogInfo(msg="[charlie_full_stack] Iniciando ARA* planner..."),
             ara_launch,
         ],
+        condition=IfCondition(NotSubstitution(mapping)),
     )
 
     # ===========================================================
     # STAGE 4 — Path Smoother (B-Splines)
     # Se lanza último: solo necesita /current_active_path,
     # que el planificador publica cuando ya tiene mapa y pose.
+    # Solo se lanza en modo localización (no en mappeo).
     # ===========================================================
     path_smoother_node = Node(
         package=planner_pkg,
         executable="path_smoother_node",
         name="path_smoother_node",
         output="screen",
+        condition=IfCondition(NotSubstitution(mapping)),
         parameters=[{
             "smoothing_factor":       2.0,
             "point_spacing":          0.05,
@@ -176,6 +221,7 @@ def generate_launch_description():
             LogInfo(msg="[charlie_full_stack] Iniciando Path Smoother..."),
             path_smoother_node,
         ],
+        condition=IfCondition(NotSubstitution(mapping)),
     )
 
     # ===========================================================
@@ -188,13 +234,15 @@ def generate_launch_description():
         declare_slam_params_file,
         declare_autostart,
         declare_use_lifecycle_manager,
+        declare_mapping,
 
         # -- Stage 1: base del robot (inmediato) --
         LogInfo(msg="[charlie_full_stack] Iniciando RSP + EKF + sensores..."),
         rsp_ekf_launch,
 
-        # -- Stage 2: localización (delay 3 s) --
-        slam_delayed,
+        # -- Stage 2: SLAM (localización o mappeo) (delay 1 s) --
+        slam_localization_delayed,
+        slam_mapping_delayed,
 
         # -- Stage 3: planificador (delay 6 s) --
         ara_delayed,
