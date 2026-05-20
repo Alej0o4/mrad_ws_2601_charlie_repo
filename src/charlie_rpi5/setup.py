@@ -30,6 +30,7 @@ setup(
         'console_scripts': [
             'twist_cmd_node = charlie_rpi5.yb_eb_node:main',
             'yb_eb_external_esc_node = charlie_rpi5.yb_eb_external_esc_node:main',
+            'fsm_aebs_node = charlie_rpi5.fsm_aebs:main',
         ],
     },
 )
