@@ -90,6 +90,8 @@ Visualization Manager:
           Value: true
         lidar_link:
           Value: true
+        map:
+          Value: true
         odom:
           Value: true
         right_steering_link:
@@ -106,37 +108,38 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        odom:
-          base_link:
-            chassis:
-              barra_horizontal_fi_link:
-                left_steering_link:
-                  leftf_wheel:
+        map:
+          odom:
+            base_link:
+              chassis:
+                barra_horizontal_fi_link:
+                  left_steering_link:
+                    leftf_wheel:
+                      {}
+                barra_horizontal_fr_link:
+                  right_steering_link:
+                    rightf_wheel:
+                      {}
+                barra_horizontal_ti_link:
+                  leftb_wheel:
                     {}
-              barra_horizontal_fr_link:
-                right_steering_link:
-                  rightf_wheel:
+                barra_horizontal_tr_link:
+                  rightb_wheel:
                     {}
-              barra_horizontal_ti_link:
-                leftb_wheel:
+                barra_vertical_de_l_link:
                   {}
-              barra_horizontal_tr_link:
-                rightb_wheel:
+                barra_vertical_de_link:
                   {}
-              barra_vertical_de_l_link:
-                {}
-              barra_vertical_de_link:
-                {}
-              barra_vertical_tr_l_link:
-                {}
-              barra_vertical_tr_link:
-                {}
-              imu_link:
-                {}
-              lidar_link:
-                {}
-              soporte:
-                {}
+                barra_vertical_tr_l_link:
+                  {}
+                barra_vertical_tr_link:
+                  {}
+                imu_link:
+                  {}
+                lidar_link:
+                  {}
+                soporte:
+                  {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -596,8 +599,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        gap_boundaries: true
-        steering_goal: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -608,7 +610,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: odom
+    Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:
