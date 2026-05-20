@@ -8,11 +8,33 @@ pure_pursuit_node:
     v_nominal_pct: 0.5  ##0.25
     max_speed_pct: 0.5  ##0.25 
     min_speed_pct: 0.05
-    max_omega:  2.715 ##1.8       # Ajusta según la capacidad de giro de tu carro
     goal_tolerance: 0.1
-    effort_to_ms_ratio: 4.0
+    decel_distance: 1.5           # Distancia para iniciar el frenado al llegar a la meta
+    wheelbase: 0.257                # Distancia entre eje trasero y delantero (m)
+    max_steer_rad: 0.349             # Ángulo máximo de dirección (ej: 20 grados)
 
+    # ----------------------------------------------------
+    # NUEVO: Mapeo de ESC (Reemplaza a effort_to_ms_ratio)
+    # ----------------------------------------------------
+    esc_cmd_points: [0.1, 0.2, 0.35, 0.5]     # Comandos PWM normalizados enviados
+    esc_speed_points: [1.3, 1.4, 1.7, 2.0]    # Velocidades físicas (m/s) medidas empíricamente
+
+    # ----------------------------------------------------
+    # NUEVO: Perfil de Velocidad (Path-Aware)
+    # ----------------------------------------------------
+    curve_lookahead_pts: 20       # Cantidad de puntos futuros a evaluar para calcular la curvatura
+    max_lat_accel: 1.2            # Aceleración lateral/centrípeta máxima permitida en curvas (m/s^2)
+
+    # ----------------------------------------------------
+    # Lookahead Dinámico
+    # ----------------------------------------------------
     lookahead_L0: 2.0
     lookahead_kv: 0.5
     lookahead_min: 1.5
     lookahead_max: 2.5
+
+    # ----------------------------------------------------
+    # Internos (Opcionales, pero buena práctica declararlos)
+    # ----------------------------------------------------
+    eps: 0.000001
+    tf_timeout_sec: 0.1

@@ -32,31 +32,40 @@ class PurePursuitNode(Node):
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("control_rate_hz", 10.0)
 
-        # ---- Parámetros de Velocidad
-        self.declare_parameter("v_nominal_pct", 0.15)
-        self.declare_parameter("max_speed_pct", 0.20)
-        self.declare_parameter("min_speed_pct", 0.05)
-        self.declare_parameter("effort_to_ms_ratio", 9.0) 
-        self.declare_parameter("max_omega", 1.8)
+        # ---- Parámetros de Mapeo ESC (Curva Real)
+        # Comando PWM normalizado
+        self.declare_parameter("esc_cmd_points", [0.1, 0.2, 0.35, 0.5])
+        # Velocidad física empírica (m/s) correspondientes
+        self.declare_parameter("esc_speed_points", [1.3, 1.4, 1.7, 2.0])
         
-        # ---- Parámetros de Frenado
+        # ---- Parámetros de Velocidad Nominal
+        self.declare_parameter("v_nominal_pct", 0.35)
+        self.declare_parameter("max_speed_pct", 0.50)
+        self.declare_parameter("min_speed_pct", 0.10)
+
+        
+        # ---- Parámetros de Frenado Dinámico (Curvatura y Meta)
         self.declare_parameter("goal_tolerance", 0.1)
         self.declare_parameter("decel_distance", 1.5)
+        self.declare_parameter("curve_lookahead_pts", 20)
+        self.declare_parameter("max_lat_accel", 1.2) # Aceleración centrípeta máxima permisible (m/s^2)
 
         # ---- Parámetros de Lookahead
         self.declare_parameter("lookahead_L0", 0.6)
-        self.declare_parameter("lookahead_kv", 0.1)
+        self.declare_parameter("lookahead_kv", 0.3)
         self.declare_parameter("lookahead_min", 0.4)
         self.declare_parameter("lookahead_max", 2.0)
 
         self.declare_parameter("eps", 1e-6)
         self.declare_parameter("tf_timeout_sec", 0.1)
+        self.declare_parameter("wheelbase", 0.257)        # Distancia entre eje trasero y delantero (m)
+        self.declare_parameter("max_steer_rad", 0.349)   # Ángulo máximo de dirección (ej: 20 grados)
 
         self.path_topic = self.get_parameter("path_topic").value
         self.cmd_topic = self.get_parameter("cmd_vel_topic").value
         self.base_frame = self.get_parameter("base_frame").value
         self.rate_hz = self.get_parameter("control_rate_hz").value
-        self.max_omega = self.get_parameter("max_omega").value
+
         
         self.L0 = self.get_parameter("lookahead_L0").value
         self.kv = self.get_parameter("lookahead_kv").value
@@ -73,7 +82,6 @@ class PurePursuitNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,
         )
 
-        # ---- Publishers y Subscribers
         self.cmd_pub = self.create_publisher(TwistStamped, self.cmd_topic, 10)
         self.marker_pub = self.create_publisher(MarkerArray, "/pure_pursuit/debug_markers", 10)
         self.path_sub = self.create_subscription(Path, self.path_topic, self.on_path, path_qos)
@@ -97,6 +105,47 @@ class PurePursuitNode(Node):
         else:
             self.has_path = False
 
+    def _get_max_curvature(self, start_idx: int) -> float:
+        """Calcula la curvatura de Menger máxima en una ventana futura para pre-frenado."""
+        if self.path_array is None:
+            return 0.0
+            
+        lookahead_pts = self.get_parameter("curve_lookahead_pts").value
+        end_idx = min(start_idx + lookahead_pts, len(self.path_array))
+        
+        # Necesitamos al menos 3 puntos separados para calcular curvatura sin ruido
+        step = 3 
+        pts = self.path_array[start_idx:end_idx:step]
+        
+        if len(pts) < 3:
+            return 0.0
+
+        # Vectorizamos el cálculo del área y lados para P[i-1], P[i], P[i+1]
+        A = pts[:-2]
+        B = pts[1:-1]
+        C = pts[2:]
+
+        # Lados del triángulo
+        a = np.linalg.norm(B - C, axis=1)
+        b = np.linalg.norm(A - C, axis=1)
+        c = np.linalg.norm(A - B, axis=1)
+
+        # Filtro de seguridad por si hay puntos duplicados (distancia 0)
+        valid = (a > self.eps) & (b > self.eps) & (c > self.eps)
+        if not np.any(valid):
+            return 0.0
+
+        A, B, C = A[valid], B[valid], C[valid]
+        a, b, c = a[valid], b[valid], c[valid]
+
+        # Área mediante determinantes (Cross product 2D)
+        area = 0.5 * np.abs(A[:,0]*(B[:,1] - C[:,1]) + B[:,0]*(C[:,1] - A[:,1]) + C[:,0]*(A[:,1] - B[:,1]))
+        
+        # Curvatura de Menger: K = 4*Area / (a*b*c)
+        curvatures = (4.0 * area) / (a * b * c)
+        
+        return float(np.max(curvatures))
+
     def on_timer(self) -> None:
         if not self.has_path or self.path_array is None:
             self.publish_stop()
@@ -114,38 +163,47 @@ class PurePursuitNode(Node):
         ry = tf.transform.translation.y
         ryaw = yaw_from_quaternion(tf.transform.rotation)
 
-        # Distancia física al ÚLTIMO punto de TODA la trayectoria (Final de la vuelta 2)
         dist_to_goal = np.hypot(self.path_array[-1, 0] - rx, self.path_array[-1, 1] - ry)
-
-        # --- VALIDACIÓN DE CIRCUITO PARA MULTIPLES VUELTAS ---
-        # Calculamos cuántos puntos de la ruta original nos faltan por recorrer
         puntos_restantes = len(self.path_array) - self.last_target_index
-        
-        # Consideramos que estamos en la verdadera recta final si quedan menos de 60 puntos
-        # (Esto equivale a unos 3 metros de distancia si tu spacing es de 0.05m)
         estamos_en_recta_final = puntos_restantes < 60
 
-        # Solo detenemos el carro si estamos físicamente en la meta Y además es el final de la última vuelta
         if dist_to_goal <= self.goal_tol and estamos_en_recta_final:
             self.publish_stop()
             self.has_path = False
             return
 
-        # --- PERFIL DE VELOCIDAD CORREGIDO ---
+        # --- EXTRACCIÓN DE PARÁMETROS DINÁMICOS ---
         v_nom_pct = self.get_parameter("v_nominal_pct").value
         min_pct = self.get_parameter("min_speed_pct").value
         decel_dist = self.get_parameter("decel_distance").value
+        
+        esc_cmd_pts = self.get_parameter("esc_cmd_points").value
+        esc_speed_pts = self.get_parameter("esc_speed_points").value
+        max_lat_accel = self.get_parameter("max_lat_accel").value
 
-        # Solo aplicamos el frenado suave si estamos llegando al final de la última vuelta
+        # 1. Base Target Velocity
         if estamos_en_recta_final and dist_to_goal < decel_dist:
-            v_cmd = min_pct + (v_nom_pct - min_pct) * (dist_to_goal / decel_dist)
+            v_cmd_target = min_pct + (v_nom_pct - min_pct) * (dist_to_goal / decel_dist)
         else:
-            v_cmd = v_nom_pct
+            v_cmd_target = v_nom_pct
 
-        v_cmd = clamp(v_cmd, min_pct, self.get_parameter("max_speed_pct").value)
+        # 2. Limitación por Curvatura Anticipada
+        k_max = self._get_max_curvature(self.last_target_index)
+        
+        if k_max > 0.01: # Si hay una curva apreciable
+            # Máxima velocidad física permitida por la aceleración lateral ( V = sqrt(a / k) )
+            v_real_limit = math.sqrt(max_lat_accel / k_max)
+            # Mapeo inverso: Velocidad física -> Comando ESC necesario
+            cmd_limit = np.interp(v_real_limit, esc_speed_pts, esc_cmd_pts)
+            v_cmd_target = min(v_cmd_target, float(cmd_limit))
+
+        # Asegurar límites absolutos del comando
+        v_cmd = clamp(v_cmd_target, min_pct, self.get_parameter("max_speed_pct").value)
+        
+        # Lookahead dinámico basado en el comando FINAL
         Ld = clamp(self.L0 + self.kv * v_cmd, self.Lmin, self.Lmax)
 
-        # Búsqueda de Punto
+        # --- BÚSQUEDA DEL PUNTO OBJETIVO ---
         start = self.last_target_index
         segment = self.path_array[start:]
 
@@ -173,7 +231,6 @@ class PurePursuitNode(Node):
         else:
             target_idx = -1
 
-        # Extraer coordenadas globales y locales para el control y RViz
         target_by = v_by[target_idx]
         target_bx = v_bx[target_idx]
         global_idx = start + valid_indices[target_idx]
@@ -182,23 +239,29 @@ class PurePursuitNode(Node):
         
         self.last_target_index = global_idx
 
-        # Control
+        # --- CONTROL DE DIRECCIÓN CON ESTIMACIÓN REAL ---
         kappa = (2.0 * target_by) / (Ld * Ld + self.eps)
-        ms_ratio = self.get_parameter("effort_to_ms_ratio").value
-        v_real_estimada = v_cmd * ms_ratio 
-        omega = clamp(v_real_estimada * kappa, -self.max_omega, self.max_omega)
+        v_real_estimada = np.interp(v_cmd, esc_cmd_pts, esc_speed_pts)
+        
+        # 1. Calculamos el ángulo de dirección ideal basado en la curvatura deseada
+        wheelbase = self.get_parameter("wheelbase").value
+        delta_ideal = math.atan(kappa * wheelbase)
+        
+        # 2. Saturamos el ángulo de dirección a los límites mecánicos reales de tu servo
+        max_steer = self.get_parameter("max_steer_rad").value
+        delta_cmd = clamp(delta_ideal, -max_steer, max_steer)
+        
+        # 3. Calculamos la omega real que corresponde a esa dirección factible
+        omega = (v_real_estimada * math.tan(delta_cmd)) / wheelbase
 
         self.publish_cmd(v_cmd, omega)
-        
-        # Publicar Debug Markers
         self.publish_debug_markers(target_x_global, target_y_global, target_bx, target_by, Ld)
 
+    # --- Los métodos publish_debug_markers, publish_cmd, publish_stop se mantienen idénticos ---
     def publish_debug_markers(self, tx_global: float, ty_global: float, tx_local: float, ty_local: float, Ld: float) -> None:
-        """Genera marcadores visuales para RViz."""
         marker_array = MarkerArray()
         now = self.get_clock().now().to_msg()
 
-        # 1. Esfera Objetivo (Verde) en el frame global
         m_target = Marker()
         m_target.header.frame_id = self.path_frame
         m_target.header.stamp = now
@@ -217,7 +280,6 @@ class PurePursuitNode(Node):
         m_target.color.b = 0.0
         m_target.color.a = 1.0
 
-        # 2. Cilindro de Radio Ld (Azul Translúcido) en el frame del robot
         m_radius = Marker()
         m_radius.header.frame_id = self.base_frame
         m_radius.header.stamp = now
@@ -236,7 +298,6 @@ class PurePursuitNode(Node):
         m_radius.color.b = 1.0
         m_radius.color.a = 0.2 
 
-        # 3. Flecha de Dirección (Roja)
         m_arrow = Marker()
         m_arrow.header.frame_id = self.base_frame
         m_arrow.header.stamp = now
@@ -269,7 +330,6 @@ class PurePursuitNode(Node):
     def publish_stop(self) -> None:
         self.publish_cmd(0.0, 0.0)
         
-        # Limpiar marcadores al detenerse
         marker_array = MarkerArray()
         m_del = Marker()
         m_del.action = Marker.DELETEALL
