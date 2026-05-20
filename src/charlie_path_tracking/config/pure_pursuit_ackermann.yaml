@@ -5,8 +5,8 @@ pure_pursuit_node:
     base_frame: "base_link"
     
     control_rate_hz: 30.0
-    v_nominal_pct: 0.6
-    max_speed_pct: 0.65 
+    v_nominal_pct: 0.7
+    max_speed_pct: 0.8 
     min_speed_pct: 0.1
     goal_tolerance: 0.1
     decel_distance: 1.5           # Distancia para iniciar el frenado al llegar a la meta
@@ -16,8 +16,8 @@ pure_pursuit_node:
     # ----------------------------------------------------
     # NUEVO: Mapeo de ESC (Reemplaza a effort_to_ms_ratio)
     # ----------------------------------------------------
-    esc_cmd_points: [0.1, 0.2, 0.35, 0.5, 0.65]     # Comandos PWM normalizados enviados
-    esc_speed_points: [1.3, 1.4, 1.7, 2.0, 2.3]    # Velocidades físicas (m/s) medidas empíricamente
+    esc_cmd_points: [0.1, 0.2, 0.35, 0.5, 0.6, 0.7, 0.8, 0.9]     # Comandos PWM normalizados enviados
+    esc_speed_points: [1.3, 1.4, 1.7, 1.85, 2.0, 2.2, 2.3, 2.4]    # Velocidades físicas (m/s) medidas empíricamente
 
     # ----------------------------------------------------
     # NUEVO: Perfil de Velocidad (Path-Aware)
