@@ -5,8 +5,8 @@ pure_pursuit_node:
     base_frame: "base_link"
     
     control_rate_hz: 30.0
-    v_nominal_pct: 0.6  ##0.25
-    max_speed_pct: 0.65  ##0.25 
+    v_nominal_pct: 0.6
+    max_speed_pct: 0.65 
     min_speed_pct: 0.1
     goal_tolerance: 0.1
     decel_distance: 1.5           # Distancia para iniciar el frenado al llegar a la meta
