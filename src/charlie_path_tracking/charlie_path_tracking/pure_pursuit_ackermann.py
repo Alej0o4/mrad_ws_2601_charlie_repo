@@ -255,7 +255,7 @@ class PurePursuitNode(Node):
         omega = (v_real_estimada * math.tan(delta_cmd)) / wheelbase
 
         self.publish_cmd(v_cmd, omega)
-        self.publish_debug_markers(target_x_global, target_y_global, target_bx, target_by, Ld)
+        # self.publish_debug_markers(target_x_global, target_y_global, target_bx, target_by, Ld)
 
     # --- Los métodos publish_debug_markers, publish_cmd, publish_stop se mantienen idénticos ---
     def publish_debug_markers(self, tx_global: float, ty_global: float, tx_local: float, ty_local: float, Ld: float) -> None:
@@ -317,7 +317,7 @@ class PurePursuitNode(Node):
         m_arrow.color.a = 0.8
 
         marker_array.markers = [m_target, m_radius, m_arrow]
-        self.marker_pub.publish(marker_array)
+        # self.marker_pub.publish(marker_array)
 
     def publish_cmd(self, v: float, w: float) -> None:
         msg = TwistStamped()
@@ -334,7 +334,7 @@ class PurePursuitNode(Node):
         m_del = Marker()
         m_del.action = Marker.DELETEALL
         marker_array.markers.append(m_del)
-        self.marker_pub.publish(marker_array)
+        # self.marker_pub.publish(marker_array)
 
 def main():
     rclpy.init()

@@ -110,7 +110,7 @@ def generate_launch_description():
             joy_node,
             teleop_node,
             twist_mux_node,
-            lidar_node,
+            # lidar_node,
             bicycle_odom,
             imu_processor_node,
             start_robot_localization_cmd,

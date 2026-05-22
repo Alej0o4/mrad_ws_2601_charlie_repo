@@ -106,7 +106,7 @@ class BicycleOdomNode(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # --- Timers ---
-        self.timer = self.create_timer(1.0 / 50.0, self._publish_loop)
+        self.timer = self.create_timer(1.0 / 30.0, self._publish_loop)
 
         # --- Estado Interno ---
         self.x = 0.0
