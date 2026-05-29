@@ -5,11 +5,11 @@ pure_pursuit_node:
     base_frame: "base_link"
     
     control_rate_hz: 30.0
-    v_nominal_pct: 1.0 # 0.8
-    max_speed_pct: 1.2 # 0.9
+    v_nominal_pct: 1.0 # 1.0(1.18min mas estable) 1.2(1.15min con suerte)
+    max_speed_pct: 1.8 # 1.4 1.8
     min_speed_pct: 0.1
     goal_tolerance: 0.1
-    decel_distance: 1.5           # Distancia para iniciar el frenado al llegar a la meta
+    decel_distance: 0.8           # Distancia para iniciar el frenado al llegar a la meta
     wheelbase: 0.257                # Distancia entre eje trasero y delantero (m)
     max_steer_rad: 0.249             # Ángulo máximo de dirección (ej: 20 grados)
 
@@ -30,7 +30,7 @@ pure_pursuit_node:
     # ----------------------------------------------------
     lookahead_L0: 1.6
     lookahead_kv: 0.5
-    lookahead_min: 1.0
+    lookahead_min: 1.6
     lookahead_max: 2.5
 
     # ----------------------------------------------------

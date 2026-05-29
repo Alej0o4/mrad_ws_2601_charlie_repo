@@ -11,7 +11,7 @@ slam_toolbox:
     ceres_loss_function: HuberLoss
 
     mode: localization                  # Estrictamente localización
-    map_file_name: /home/alejo/mrad_ws_2601_charlie_repo/src/charlie_gazebo/real_slam_data/b_a_19_ser.data # IMPORTANTE: Ruta al archivo .posegraph
+    map_file_name: /home/miconra/mrad_ws_2601_charlie_repo/src/charlie_gazebo/real_slam_data/b_a_carrera_ser.data # IMPORTANTE: Ruta al archivo .posegraph
     map_start_pose: [0.0, 0.0, 0.0]     # Ajustar si el origen es distinto
 
     # ---------------------------------------------------------
@@ -24,7 +24,7 @@ slam_toolbox:
     
     # Alta frecuencia para mantener el TF suave para Pure Pursuit
     transform_publish_period: 0.02     
-    minimum_time_interval: 0.02 
+    minimum_time_interval: 0.05 
     
     # Publicación del grid map casi nula para ahorrar CPU en la Pi 5
     map_update_interval: 10.0           
@@ -36,8 +36,8 @@ slam_toolbox:
     # Zona Segura: Criterios de actualización del Scan Matcher
     # ---------------------------------------------------------
     # Restringir las actualizaciones reduce los saltos abruptos
-    minimum_travel_distance: 0.5        # Solo procesa si se movió 50cm
-    minimum_travel_heading: 0.5         # Solo procesa si rotó ~28 grados
+    minimum_travel_distance: 0.1        # Solo procesa si se movió 50cm
+    minimum_travel_heading: 0.1         # Solo procesa si rotó ~28 grados
     use_scan_matching: true
     use_scan_barycenter: true
 
