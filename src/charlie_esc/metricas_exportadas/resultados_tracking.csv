@@ -1,0 +1,4 @@
+Bag_Name,Tiempo_Total_s,Distancia_m,V_Real_Avg_ms,V_Real_Max_ms,CTE_RMSE_m,CTE_Max_m,Control_Effort_Var
+fast_1,126.066,195.863,1.554,2.367,14.9241,27.2113,0.1255
+medium_1,122.233,198.656,1.617,1.826,11.0247,19.7506,0.0638
+slow_2,145.8,202.15,1.379,1.481,1.7917,5.5475,
