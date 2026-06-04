@@ -23,14 +23,27 @@ def generate_launch_description():
 
     declare_map_name_cmd = DeclareLaunchArgument(
         'map_name',
-        default_value='walls_wolrd2_serialized',
+        default_value='b_a_carrera_ser',
         description='Nombre del mapa serializado a cargar (sin la extension)',
-        choices=['walls_wolrd2_serialized','RaceTrack', 'RaceTrackObs', 'demo_race_track', 'walls_practice']
+        choices=['walls_wolrd2_serialized',
+                 'RaceTrack', 
+                 'RaceTrackObs', 
+                 'demo_race_track', 
+                 'walls_practice',
+                 'bloque_A_V2_ser',
+                 'bloque_c_ser',
+                 'salon_12_c_v2_ser',
+                 's_16_a_ser',
+                 'b_a_ser',
+                 'b_a_2_ser',
+                 'b_a_19_ser',
+                    'b_a_carrera_ser'
+                 ]
     )
 
     map_file_path = PathJoinSubstitution([
         FindPackageShare('charlie_gazebo'),
-        'slam_data',
+        'real_slam_data',
         LaunchConfiguration('map_name')
     ])
 
@@ -43,7 +56,7 @@ def generate_launch_description():
         description='Enable bond connection during node activation')
     declare_use_sim_time_argument = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='true',
+        default_value='false',
         description='Use simulation/Gazebo clock')
     declare_slam_params_file_cmd = DeclareLaunchArgument(
         'slam_params_file',

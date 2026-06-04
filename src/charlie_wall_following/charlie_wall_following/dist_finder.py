@@ -3,11 +3,12 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32
-from rclpy.qos import QoSProfile
 import numpy as np
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA # Para definir colores
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+
 
 class DistFinder(Node):
     def __init__(self):
@@ -37,9 +38,14 @@ class DistFinder(Node):
 
         # QoS
         qos_profile = QoSProfile(depth=10)
+        qos_sensor = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
 
         # Subs / Pubs
-        self.subscription = self.create_subscription(LaserScan, '/scan', self.callback, qos_profile)
+        self.subscription = self.create_subscription(LaserScan, '/scan_filtered', self.callback, qos_sensor)
         self.marker_publisher = self.create_publisher(Marker, '/debug_rays', qos_profile) # Para visualización en RViz
         self.error_publisher = self.create_publisher(Float32, '/error', qos_profile)
 
@@ -51,6 +57,9 @@ class DistFinder(Node):
         total = len(msg.ranges)
         left_sector = np.array(msg.ranges[int(total*0.7):int(total*0.9)]) # Adjusted indices
         right_sector = np.array(msg.ranges[int(total*0.1):int(total*0.3)])
+
+        # right_sector = np.array(msg.ranges[int(total*0.7):int(total*0.9)])
+        # left_sector  = np.array(msg.ranges[int(total*0.1):int(total*0.3)])
         
         # Filter valid points
         left_valid = left_sector[np.isfinite(left_sector)]
@@ -62,8 +71,8 @@ class DistFinder(Node):
         r_dist = np.mean(right_valid) if len(right_valid) > 0 else 5.0
 
         # Example: Simple logic to favor the closer wall
-        side_threshold = 10000.8
-        right_priority_bonus = 1000.4
+        side_threshold = 0.8
+        right_priority_bonus = 0.5
 
         if self.desired_wall_side == -1:
             # Solo cambia a la izquierda si la pared izquierda está REALMENTE más cerca
@@ -82,7 +91,8 @@ class DistFinder(Node):
 
         self.ray_b_angle = self.desired_wall_side * np.pi/2    
 
-        front_sector = np.array(msg.ranges[int(total*0.45):int(total*0.55)])
+        # front_sector = np.array(msg.ranges[int(total*0.45):int(total*0.55)])
+        front_sector = np.array(msg.ranges[int(total*0.45):int(total*0.55)]) # Ajuste para capturar mejor el frente
         front_valid = front_sector[np.isfinite(front_sector)]
         front_min = np.min(front_valid) if len(front_valid) > 0 else 5.0
         
@@ -117,13 +127,23 @@ class DistFinder(Node):
         self.error_publisher.publish(error_msg)
         self.publish_debug_rays(b, a, msg.header)
 
+
+    def normalize_angle(self, angle):
+        while angle > np.pi:
+            angle -= 2 * np.pi
+        while angle < -np.pi:
+            angle += 2 * np.pi
+        return angle
+
     def getRange(self, msg):
         # Rayo B: A 90 grados
         ray_b_angle = self.ray_b_angle
-        
         # Si pared izquierda (90): A = 90 - 45 = 45 (adelante-izq)
         # Si pared derecha (-90): A = -90 - (-45) = -45 (adelante-der)
         ray_a_angle = ray_b_angle - (self.theta * self.desired_wall_side)
+
+        ray_b_angle = self.ray_b_angle
+        ray_a_angle = self.ray_b_angle - (self.theta * self.desired_wall_side)
 
         # Convertir ángulos a índices del array
         # Formula: index = (angle - min_angle) / increment
@@ -168,8 +188,9 @@ class DistFinder(Node):
         # X = dist * cos(theta), Y = dist * sin(theta)
         
         # Ángulos actuales (Recalculamos lo mismo que en getRange para dibujar)
-        angle_b = self.ray_b_angle
-        angle_a = angle_b - (self.theta * self.desired_wall_side)
+        LIDAR_OFFSET = 3.1416
+        angle_b = self.normalize_angle(self.ray_b_angle + LIDAR_OFFSET)
+        angle_a = self.normalize_angle(self.ray_b_angle - (self.theta * self.desired_wall_side) + LIDAR_OFFSET)
 
         # Punto B (Final del rayo)
         pb_x = dist_b * np.cos(angle_b)

@@ -1,7 +1,7 @@
 waypoint_manager:
   ros__parameters:
     # Modo de funcionamiento
-    use_rviz_clicks: false  # Si es false, usará la lista de abajo
+    use_rviz_clicks: true  # Si es false, usará la lista de abajo
     
     # Tu pista de carreras predefinida [x1, y1, x2, y2, ...]
     static_waypoints: [

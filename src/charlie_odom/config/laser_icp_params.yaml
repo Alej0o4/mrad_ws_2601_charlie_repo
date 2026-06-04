@@ -1,0 +1,36 @@
+laser_icp_node:
+  ros__parameters:
+    scan_topic: /scan_filtered
+    motion_prior_topic: /odom
+    odom_topic: /odom_laser
+    valid_topic: /odom_laser/valid
+    score_topic: /odom_laser/score
+    odom_frame: odom
+    base_frame: base_link
+    laser_frame: lidar_link
+    # ===== OFFSETS DEL SENSOR (brazo de palanca) =====
+    lidar_offset_x: 0.0                          # Distancia X del LiDAR respecto a base_link (m)
+    lidar_offset_y: 0.0                          # Distancia Y del LiDAR respecto a base_link (m)
+    publish_tf: true
+    publish_twist: true
+    use_motion_seed: true
+    update_rate_hz: 10.0
+    process_every_n_scans: 1
+    scan_timeout_s: 0.5
+    crop_min_angle: -3.141592653589793
+    crop_max_angle: 3.141592653589793
+    scan_stride: 2
+    max_scan_points: 240
+    min_valid_points: 80
+    min_angular_span: 1.0
+    max_iterations: 20
+    max_correspondence_distance: 0.25
+    transformation_epsilon: 0.0001
+    fitness_epsilon: 0.0001
+    min_fitness_score: 0.35
+    keyframe_translation_thresh: 0.20
+    keyframe_rotation_thresh: 0.15
+    pose_covariance_xy: 0.03
+    pose_covariance_yaw: 0.10
+    covariance_scale_from_fitness: 2.0
+    covariance_scale_from_motion: 0.5

@@ -1,0 +1,25 @@
+open_loop_odom_node:
+  ros__parameters:
+    # Configuración de Tópicos y Frames
+    cmd_vel_topic: "/cmd_vel_aebs"
+    odom_topic: "/odom"
+    base_frame: "base_link"
+    odom_frame: "odom"
+    
+    # Configuración del Sistema
+    update_rate_hz: 50.0
+    wheelbase: 0.257
+    wheel_radius: 0.053
+    
+    # --- Look-Up Table (Valores Empíricos en m/s y rad/s) ---
+    v_slow: 0.412   # Velocidad medida cuando PWM es 0.04
+    v_fast: 1.255   # Velocidad medida cuando PWM es 0.05
+    w_turn: 1.5     # Velocidad angular empírica al girar
+    w_scale: 1.0   # Multiplicador lineal para la dirección
+    
+    # --- Umbrales para la Detección de Comandos PWM ---
+    # Esto define cómo se comporta el clasificador de estados interno
+    pwm_fast_threshold: 0.045  # Si el comando lineal supera esto, activa estado FAST (0.05)
+    pwm_deadzone: 0.01         # Si cae por debajo de 1%, se asume IDLE (quieto)
+    pwm_turn_threshold: 0.02   # Si el comando angular supera esto, se asume un giro
+    

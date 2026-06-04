@@ -3,6 +3,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
 from geometry_msgs.msg import TwistStamped
+import numpy as np
 
 class TtcControl(Node): 
     def __init__(self):
@@ -42,45 +43,40 @@ class TtcControl(Node):
         self.get_logger().info("TTC Control Node Initialized")
     
     def callback(self, msg):
-        # msg viene del gap_finder. 
-        # msg.twist.angular.z contiene el ángulo hacia el centro del hueco (gap).
-        
-        #target_angle = msg.twist.angular.z
         raw_angle = msg.twist.angular.z
+        geometric_multiplier = msg.twist.linear.x  
 
-        # --- [MEJORA] FILTRO DE SUAVIZADO (Exponential Moving Average) ---
-        # alpha controla la suavidad:
-        # 1.0 = Sin suavizado (reacción instantánea, mucha oscilación)
-        # 0.1 = Muy suave (reacción lenta, como un barco)
-        # 0.6 es un buen equilibrio para Racing: reacciona rápido pero filtra el ruido.
-        alpha = 0.4
-        
+        alpha = 0.85
         target_angle = (alpha * raw_angle) + ((1.0 - alpha) * self.last_target_angle)
-        self.last_target_angle = target_angle # Guardamos para la siguiente vez
+        self.last_target_angle = target_angle 
 
-        # --- LEY DE CONTROL DE DIRECCIÓN (STEERING) ---
-        # Como el robot mira a 0, el error es: Deseado - Actual(0) = target_angle
-        # Aplicamos control Proporcional
         angular_cmd = self.kp * target_angle
-
-        # Saturación (Clamping)
-        # Evitamos mandar comandos que el robot no puede ejecutar físicamente
         angular_cmd = max(min(angular_cmd, self.max_steering), -self.max_steering)
 
-        # --- LEY DE CONTROL DE VELOCIDAD (THROTTLE) ---
-        # Estrategia de Racing:
-        # - Recta (ángulo 0) -> Velocidad Máxima
-        # - Curva cerrada (ángulo alto) -> Velocidad Mínima
-        # Fórmula: V = V_max / (1 + abs(giro) * factor)
-        linear_cmd = self.max_speed / (1.0 + abs(angular_cmd))
+        # ---------------------------------------------------------
+        # LEY DE VELOCIDAD POR ESTADOS
+        # ---------------------------------------------------------
+        min_survival_speed = 0.04  # Ajusta esto a tu famosa velocidad del "4%" en m/s
+        k_factor = 0.8           
+        
+        if geometric_multiplier < 0.5:
+            # MODO CRÍTICO: El motor está en su límite bajo.
+            # IGNORAMOS la campana de Gauss para no ahogar el motor en la curva.
+            linear_cmd = self.max_speed * geometric_multiplier
+            
+        else:
+            # MODO NORMAL/CRUISE: Tenemos inercia suficiente.
+            # Aplicamos la reducción por curva normalmente.
+            dynamic_max_speed = self.max_speed * geometric_multiplier
+            decay = np.exp(-k_factor * (angular_cmd ** 2))
+            speed_range = dynamic_max_speed - min_survival_speed
+            linear_cmd = min_survival_speed + (speed_range * decay)
 
-        # --- PUBLICACIÓN ---
+        # Seguridad absoluta final
+        linear_cmd = max(linear_cmd, min_survival_speed)
+
         out_msg = TwistStamped()
-        
-        # CRÍTICO: Copiar el header para mantener la sincronización de tiempo
-        # Si el gap_finder detectó el hueco en T=100, este comando es para T=100.
         out_msg.header = msg.header
-        
         out_msg.twist.linear.x = float(linear_cmd)
         out_msg.twist.angular.z = float(angular_cmd)
         

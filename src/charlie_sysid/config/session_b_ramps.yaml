@@ -1,0 +1,7 @@
+sysid_excitation_node:
+  ros__parameters:
+    interpolation_mode: "linear" # Hace que numpy cree las pendientes automáticamente
+    # [Inicio, Pico 1, Fin 1, Pico 2, Fin 2...]
+    t_keys: [0.0, 3.0, 6.0, 9.0, 12.0]
+    v_keys: [0.0, 1.0, 0.0, 1.0, 0.0]
+    w_keys: [0.0, 0.0, 0.0, 0.0, 0.0]

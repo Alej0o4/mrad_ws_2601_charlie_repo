@@ -1,0 +1,51 @@
+ekf_filter_node:
+  ros__parameters:
+    use_sim_time: true # Cambiar a false en el robot real
+    frequency: 30.0
+    two_d_mode: true
+    publish_tf: true
+
+    # Frames del sistema REP-105
+    map_frame: map              # SLAM Toolbox manejará map -> odom
+    odom_frame: odom            # EKF manejará odom -> base_link
+    base_link_frame: base_link
+    world_frame: odom           # IMPORTANTE: El EKF local debe tener world_frame = odom
+
+    # Entrada 1: Odometría de Bicicleta (bicycle_odom_node)
+    # [x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw]
+    odom0: /odom
+    odom0_config: [false, false, false, # No usamos posición absoluta (deriva)
+                   false, false, false, 
+                   true,  false, false, # Usamos velocidad lineal X (v)
+                   false, false, true]  # Usamos velocidad angular Z (w)
+    odom0_differential: false
+    odom0_relative: false
+
+    # Entrada 2: IMU (Imu_node con Madgwick)
+    imu0: /imu/data_corrected
+    imu0_config: [false, false, false,
+                  false, false, false,  # Usamos el Yaw del Madgwick
+                  false, false, false,
+                  false, false, true,  # Usamos el Yaw rate (gyro)
+                  false, false, false]
+    imu0_differential: false
+    imu0_relative: true # Ayuda a que el Yaw empiece en 0 al encender
+    imu0_remove_gravitational_acceleration: true
+
+    # Matrices de Ruido de Proceso (Q) - Ajuste fino
+    # Si el robot "salta" mucho, reduce estos valores.
+    process_noise_covariance: [0.05, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.05,  0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.06,  0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.03,  0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.03,  0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.06,  0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.025, 0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.025, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.04,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.01,  0.0,    0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.01,  0.0,    0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.02,  0.0,    0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.01,  0.0,    0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.01,  0.0,
+                               0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.015]

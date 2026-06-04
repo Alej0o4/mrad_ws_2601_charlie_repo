@@ -1,0 +1,23 @@
+twist_cmd_node_charlie: 
+  ros__parameters:
+    cmd_vel_topic: '/cmd_vel_aebs'  
+    imu_topic: '/imu/data_raw'
+    mag_topic: '/imu/mag'
+    voltage_topic: 'voltage'
+
+    throttle:
+      V_MAX: 1.0 
+      LIMIT_PERCENT: 0.051 ##0.051  # <--- [NEW] 0.5 = Permite solo el 50% de V_MAX.
+      PWM_MAX_FWD: 120.0 
+      PWM_MIN_FWD:  99.0 
+      PWM_CENTER: 90.0
+      PWM_MIN_REV: 83.4
+      PWM_MAX_REV: 60.0
+      
+    steering:
+      ANGLE_MAX: 1.0
+      LIMIT_PERCENT: 1.0  # <--- [NEW] 1.0 = Permite el 100% de giro.
+      PWM_MIN: 50.0   
+      PWM_MAX: 130.0  
+    
+    min_battery_voltage: 11.4

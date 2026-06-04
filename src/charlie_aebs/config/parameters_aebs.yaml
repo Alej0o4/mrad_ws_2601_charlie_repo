@@ -1,7 +1,9 @@
 aebs: 
   ros__parameters:
-    robot_width: 0.44
-    safety_margin: 0.18
-    ttc_threshold: 0.8
+    robot_width: 0.3
+    # safety_margin: 0.15
+    ttc_threshold: 1.0
     aebs_mode: "tunnel"  
     safety_factor: 2.0
+    lidar_yaw_offset: 3.14159
+    chassis_length: 0.37

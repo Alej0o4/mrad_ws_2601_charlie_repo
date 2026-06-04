@@ -22,7 +22,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             config_file_path,
-            {'use_sim_time': True}  
+            {'use_sim_time': False}  
         ]
     )
 
@@ -34,7 +34,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
             config_file_path,
-            {'use_sim_time': True}  
+            {'use_sim_time': False}  
         ]
     )
 
