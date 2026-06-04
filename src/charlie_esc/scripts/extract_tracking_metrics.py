@@ -62,38 +62,58 @@ def extract_reference_path(reader):
         return np.array(waypoints)
     return None
 
+def extract_slam_pose(msg):
+    """Extrae la posición X, Y global y corregida directamente de SLAM"""
+    return (
+        msg.pose.pose.position.x,
+        msg.pose.pose.position.y
+    )
+
 def process_bag(bag_path):
-    """Procesa un solo bag y retorna las métricas y el DataFrame detallado."""
+    """Procesa un solo bag extrayendo la posición global real de SLAM."""
     print(f"Procesando: {bag_path.name}")
     
     with Reader(bag_path) as reader:
-        # Extraer tópicos con los nuevos requerimientos
-        df_odom_pose = read_topic(reader, '/odom', extract_odometry_pose)
-        df_odom_twist = read_topic(reader, '/odom/twist', extract_twist_stamped)
+        # 1. Extraemos la posición real (Baja frecuencia, ~2Hz)
+        df_slam = read_topic(reader, '/pose', extract_slam_pose)
+        
+        # 2. Extraemos los datos del vehículo (Alta frecuencia, ~30Hz+)
+        df_twist = read_topic(reader, '/odom/twist', extract_twist_stamped) 
         df_cmd_vel = read_topic(reader, '/cmd_vel_raw', extract_twist_stamped)
         df_steer = read_topic(reader, '/servo/steering_cmd', extract_float32)
         ref_path = extract_reference_path(reader)
 
-    if df_odom_pose.empty:
-        print(f"  [ERROR] Odometría (pose) faltante en {bag_path.name}")
+    if df_slam.empty or df_twist.empty:
+        print(f"  [ERROR] Faltan datos críticos (/pose o /odom/twist) en {bag_path.name}")
         return None, None
 
-    # Asignar nombres a las columnas de la base de tiempo principal (Pose)
-    df_odom_pose.columns = ['Timestamp', 'X', 'Y']
-    df_odom_pose.sort_values('Timestamp', inplace=True)
-    df_merged = df_odom_pose.copy()
+    # Asignar columnas
+    df_slam.columns = ['Timestamp', 'X', 'Y']
+    df_twist.columns = ['Timestamp', 'V_real']
 
-    # --- Sincronización Temporal (Merge As-Of hacia atrás) ---
+    # --- FUSIÓN E INTERPOLACIÓN (El núcleo de la solución) ---
+    # Unimos todos los timestamps (los de SLAM y los del Twist) en una sola línea de tiempo
+    df_merged = pd.merge(df_twist, df_slam, on='Timestamp', how='outer')
+    df_merged.sort_values('Timestamp', inplace=True)
+    df_merged.reset_index(drop=True, inplace=True)
 
-    # 1. Velocidad Real (/odom/twist)
-    if not df_odom_twist.empty:
-        df_odom_twist.columns = ['Timestamp', 'V_real']
-        df_odom_twist.sort_values('Timestamp', inplace=True)
-        df_merged = pd.merge_asof(df_merged, df_odom_twist, on='Timestamp', direction='backward')
-    else:
-        df_merged['V_real'] = np.nan
+    # Interpolamos linealmente X e Y para rellenar los milisegundos vacíos
+    df_merged['X'] = df_merged['X'].interpolate(method='linear')
+    df_merged['Y'] = df_merged['Y'].interpolate(method='linear')
 
-    # 2. Comando de Velocidad Escalado (/cmd_vel_raw)
+    # [CORRECCIÓN]: Propagar el primer y último valor de SLAM a los bordes 
+    # por si la odometría arrancó antes o terminó después que el SLAM
+    df_merged['X'] = df_merged['X'].bfill().ffill()
+    df_merged['Y'] = df_merged['Y'].bfill().ffill()
+
+    # Eliminamos las filas donde V_real es NaN
+    df_merged = df_merged.dropna(subset=['V_real'])
+    
+    # [SEGURIDAD EXTREMA]: Garantizar que no haya ningún NaN residual en X o Y 
+    # antes de pasarle la matriz al cKDTree de Scipy
+    df_merged = df_merged.dropna(subset=['X', 'Y'])
+
+    # --- Sincronizar el resto de comandos ---
     if not df_cmd_vel.empty:
         df_cmd_vel.columns = ['Timestamp', 'V_cmd_scaled']
         df_cmd_vel.sort_values('Timestamp', inplace=True)
@@ -101,7 +121,6 @@ def process_bag(bag_path):
     else:
         df_merged['V_cmd_scaled'] = np.nan
 
-    # 3. Comando de Dirección (/servo/steering_cmd)
     if not df_steer.empty:
         df_steer.columns = ['Timestamp', 'Steering']
         df_steer.sort_values('Timestamp', inplace=True)
@@ -112,35 +131,32 @@ def process_bag(bag_path):
     # Normalizar Timestamp a t=0
     df_merged['Timestamp'] -= df_merged['Timestamp'].iloc[0]
 
-    # --- Cálculo del Cross-Track Error (CTE) con el path suavizado ---
+    # --- Cálculo del Cross-Track Error (CTE) ---
     if ref_path is not None and len(ref_path) > 0:
         kdtree = cKDTree(ref_path)
         robot_positions = df_merged[['X', 'Y']].values
         distances, _ = kdtree.query(robot_positions)
         df_merged['CTE'] = distances
+        
+        # Guardar el path de referencia para Colab (se sobrescribirá, está bien)
+        pd.DataFrame(ref_path, columns=['X', 'Y']).to_csv("metricas_exportadas/reference_path.csv", index=False)
     else:
         print("  [WARNING] No se encontró /smoothed_path. CTE será NaN.")
         df_merged['CTE'] = np.nan
 
     # --- Cálculo de Métricas Finales ---
     t_total = df_merged['Timestamp'].iloc[-1]
-    
-    # Distancia recorrida (integración discreta)
     dx = np.diff(df_merged['X'])
     dy = np.diff(df_merged['Y'])
     dist_total = np.sum(np.sqrt(dx**2 + dy**2))
-    
     v_avg = df_merged['V_real'].mean()
     v_max = df_merged['V_real'].max()
-    
     cte_rmse = np.sqrt(np.mean(df_merged['CTE']**2)) if 'CTE' in df_merged else np.nan
     cte_max = df_merged['CTE'].max() if 'CTE' in df_merged else np.nan
     
-    # Esfuerzo de control (Varianza de la tasa de cambio de dirección)
     if 'Steering' in df_merged and not df_merged['Steering'].isna().all():
         dt = np.diff(df_merged['Timestamp'])
         d_steer = np.diff(df_merged['Steering'])
-        # Evitar división por cero
         d_steer_dt = np.divide(d_steer, dt, out=np.zeros_like(d_steer), where=dt!=0)
         control_effort = np.var(d_steer_dt)
     else:
@@ -157,7 +173,6 @@ def process_bag(bag_path):
         'Control_Effort_Var': round(control_effort, 4)
     }
 
-    # Reordenar columnas para el CSV detallado
     cols_order = ['Timestamp', 'X', 'Y', 'V_cmd_scaled', 'V_real', 'Steering', 'CTE']
     df_merged = df_merged[[c for c in cols_order if c in df_merged.columns]]
 
